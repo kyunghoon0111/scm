@@ -28,6 +28,7 @@ MIGRATIONS = [
     "migrations/09_settings_tables.sql",
     "migrations/10_views.sql",
     "migrations/11_upload_contracts.sql",
+    "migrations/12_backend_job_log.sql",
 ]
 
 

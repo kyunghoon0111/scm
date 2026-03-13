@@ -35,7 +35,8 @@ jobs:
                    migrations/08_ml_schema.sql \
                    migrations/09_settings_tables.sql \
                    migrations/10_views.sql \
-                   migrations/11_upload_contracts.sql; do
+                   migrations/11_upload_contracts.sql \
+                   migrations/12_backend_job_log.sql; do
             echo "Running $f ..."
             psql "$DATABASE_URL" -f "$f"
           done
