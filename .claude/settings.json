@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git reset:*)",
+      "Bash(git -C \"c:\\\\Users\\\\김경훈\\\\Desktop\\\\auto_pj\" show --name-status HEAD~1)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\김경훈\\Desktop\\auto_pj\\frontend\\src\\{api,store,components"
+    ]
+  }
+}

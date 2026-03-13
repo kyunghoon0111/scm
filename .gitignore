@@ -1,0 +1,50 @@
+# 환경변수 (비밀정보)
+.env
+.env.local
+.env.*.local
+api/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+
+# Node.js
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# DuckDB 데이터 파일
+data/
+*.duckdb
+*.duckdb.wal
+
+# 데이터 투입 폴더
+inbox/
+outbox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 로그
+*.log
+
+# 임시 파일
+*.tmp
+temp/
+tmp/
+tsconfig.tsbuildinfo

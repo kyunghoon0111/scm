@@ -1,0 +1,7 @@
+duckdb
+polars
+pyarrow
+psycopg2-binary
+pyyaml
+python-dotenv
+openpyxl

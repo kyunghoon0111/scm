@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(pip install:*)",
+      "Bash(findstr:*)",
+      "Bash(npx tsc:*)",
+      "Bash(find:*)",
+      "Bash(git -C \"c:\\\\Users\\\\김경훈\\\\Desktop\\\\auto_pj\" status --short)",
+      "Bash(git -C \"c:\\\\Users\\\\김경훈\\\\Desktop\\\\auto_pj\" log --oneline)"
+    ]
+  }
+}

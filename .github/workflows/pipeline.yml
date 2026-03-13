@@ -1,0 +1,70 @@
+name: Run Pipeline
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # 매일 오전 10시 KST (UTC+9)
+  workflow_dispatch:       # 수동 트리거
+  repository_dispatch:     # 업로드 UI에서 트리거
+    types: [run-pipeline]
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run database migrations
+        run: |
+          for f in migrations/01_create_schemas.sql \
+                   migrations/02_core_dimensions.sql \
+                   migrations/03_core_facts.sql \
+                   migrations/04_mart_tables.sql \
+                   migrations/05_ops_tables.sql \
+                   migrations/06_indexes.sql \
+                   migrations/07_rls_policies.sql \
+                   migrations/08_ml_schema.sql \
+                   migrations/09_settings_tables.sql \
+                   migrations/10_views.sql \
+                   migrations/11_upload_contracts.sql; do
+            echo "Running $f ..."
+            psql "$DATABASE_URL" -f "$f"
+          done
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Download files from Supabase Storage
+        run: python scripts/download_uploads.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      - name: Run pipeline
+        run: python run.py --once
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      - name: Update pipeline status (success)
+        if: success()
+        run: python scripts/update_status.py --status success
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      - name: Update pipeline status (failure)
+        if: failure()
+        run: python scripts/update_status.py --status failed
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
