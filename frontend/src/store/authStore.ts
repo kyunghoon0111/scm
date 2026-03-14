@@ -66,6 +66,13 @@ function decodeJwtPayload(token: string | undefined): Record<string, unknown> | 
   }
 }
 
+/**
+ * Role resolution priority (matches DB function public.current_app_role()):
+ *   1. app_metadata.role  — set by admin via service key, most trusted
+ *   2. user_metadata.role — set by user, less trusted
+ *   3. JWT role claim     — Supabase auth role
+ *   4. fallback "readonly"
+ */
 function extractRole(
   user: {
     app_metadata?: Record<string, unknown>;
@@ -74,7 +81,7 @@ function extractRole(
   accessToken?: string,
 ): Role {
   const jwtPayload = decodeJwtPayload(accessToken);
-  const candidates = [jwtPayload?.role, user.app_metadata?.role, user.user_metadata?.role];
+  const candidates = [user.app_metadata?.role, user.user_metadata?.role, jwtPayload?.role];
 
   for (const candidate of candidates) {
     if (isRole(candidate)) return candidate;

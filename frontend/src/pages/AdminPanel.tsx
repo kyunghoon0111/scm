@@ -256,6 +256,7 @@ export default function AdminPanel() {
               </div>
               <button
                 onClick={() => {
+                  if (!window.confirm("파이프라인 락을 해제합니다.\n진행 중인 작업이 있다면 데이터 정합성에 문제가 생길 수 있습니다.\n\n정말 해제하시겠습니까?")) return;
                   setMessage(null);
                   void unlockMutation.mutateAsync();
                 }}
@@ -284,6 +285,7 @@ export default function AdminPanel() {
               </label>
               <button
                 onClick={() => {
+                  if (!window.confirm(`최근 ${rollbackBatchCount}개 배치를 롤백합니다.\n롤백된 데이터는 복구할 수 없습니다.\n\n정말 롤백하시겠습니까?`)) return;
                   setMessage(null);
                   void rollbackMutation.mutateAsync(rollbackBatchCount);
                 }}

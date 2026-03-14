@@ -20,11 +20,7 @@ import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
 import ErrorState from "../common/ErrorState";
 import KpiCard from "../common/KpiCard";
-
-function fmtKrw(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "-";
-  return value.toLocaleString();
-}
+import { fmtKrw } from "../../lib/format";
 
 export default function Revenue() {
   const { fromDate, toDate, groupBy, setGroupBy, itemId, channelStoreId } = useFilterStore();

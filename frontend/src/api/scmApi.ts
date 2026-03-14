@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { fromMart } from "../lib/supabase";
 import { QUERY_CONFIG } from "./queryConfig";
+import { wrap } from "./apiUtils";
 import type { ApiResponse } from "../types/common";
 import type {
   InventoryOnhandRow,
@@ -88,32 +89,6 @@ function listPeriodsInRange(fromDate: string, toDate: string): string[] {
   }
 
   return periods;
-}
-
-function wrap<T>(data: T[] | null, error: unknown): ApiResponse<T[]> {
-  if (error) throw error;
-  const rows = data ?? [];
-  const coverageValues = rows
-    .map((row) => (row as Record<string, unknown>).coverage_flag)
-    .filter((flag): flag is string => typeof flag === "string");
-  const coverageFlag =
-    rows.length === 0
-      ? "NO_DATA"
-      : coverageValues.length === 0
-        ? "ACTUAL"
-        : coverageValues.every((flag) => flag === "ACTUAL")
-          ? "ACTUAL"
-          : "PARTIAL";
-  return {
-    success: true,
-    data: rows,
-    meta: {
-      row_count: rows.length,
-      queried_at: new Date().toISOString(),
-      coverage_flag: coverageFlag,
-    },
-    errors: [],
-  };
 }
 
 // period 컬럼이 있는 테이블만 period 필터 적용

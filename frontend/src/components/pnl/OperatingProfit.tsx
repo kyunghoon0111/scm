@@ -19,16 +19,7 @@ import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
 import ErrorState from "../common/ErrorState";
 import KpiCard from "../common/KpiCard";
-
-function fmtKrw(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "-";
-  return value.toLocaleString();
-}
-
-function fmtPct(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "-";
-  return `${(value * 100).toFixed(1)}%`;
-}
+import { fmtKrw, fmtPct } from "../../lib/format";
 
 export default function OperatingProfit() {
   const { fromDate, toDate, groupBy, setGroupBy, itemId, channelStoreId } = useFilterStore();

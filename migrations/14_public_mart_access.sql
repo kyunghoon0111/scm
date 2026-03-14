@@ -9,23 +9,20 @@ LANGUAGE sql
 STABLE
 AS $$
   SELECT COALESCE(
+    -- 1. app_metadata.role: admin(service key)만 설정 가능, 가장 신뢰
     NULLIF(auth.jwt() -> 'app_metadata' ->> 'role', ''),
+    -- 2. user_metadata.role: 사용자가 직접 설정 가능, 덜 신뢰
     NULLIF(auth.jwt() -> 'user_metadata' ->> 'role', ''),
+    -- 3. 비인증 사용자는 접근 차단 (NULL 반환)
     CASE
-      WHEN auth.jwt() ->> 'role' IN ('admin', 'scm', 'pnl', 'ops', 'readonly')
-      THEN auth.jwt() ->> 'role'
-      ELSE NULL
-    END,
-    CASE
-      WHEN auth.role() = 'anon' THEN 'anon'
-      ELSE NULL
-    END,
-    'readonly'
+      WHEN auth.role() = 'anon' THEN NULL
+      ELSE 'readonly'
+    END
   );
 $$;
 
 COMMENT ON FUNCTION public.current_app_role IS
-  'Resolve app role from app_metadata.role, user_metadata.role, JWT role, then anon/readonly.';
+  'Resolve app role: app_metadata.role > user_metadata.role > readonly (authenticated only). Returns NULL for anonymous.';
 
 DO $$
 DECLARE
@@ -115,40 +112,73 @@ ALTER TABLE mart.mart_lead_time_analysis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mart.mart_model_performance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mart.mart_charge_allocated ENABLE ROW LEVEL SECURITY;
 
--- Public dashboard marts: anonymous/demo users can read.
-CREATE POLICY "public_mart_read" ON mart.mart_inventory_onhand FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_stockout_risk FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_overstock FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_expiry_risk FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_fefo_pick_list FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_open_po FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_service_level FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_shipment_performance FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_shipment_daily FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_return_analysis FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_return_daily FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_pnl_revenue FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_pnl_cogs FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_pnl_gross_margin FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_pnl_variable_cost FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_pnl_contribution FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_pnl_operating_profit FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_pnl_waterfall_summary FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_reco_inventory_movement FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_reco_oms_vs_wms FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_reco_erp_gr_vs_wms_receipt FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_reco_settlement_vs_estimated FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_reco_charges_invoice_vs_allocated FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_constraint_signals FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_constraint_root_cause FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_constraint_action_plan FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_constraint_effectiveness FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_coverage_period FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_forecast_accuracy FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_demand_plan FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_replenishment_plan FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_lead_time_analysis FOR SELECT USING (true);
-CREATE POLICY "public_mart_read" ON mart.mart_model_performance FOR SELECT USING (true);
+-- Authenticated users can read dashboard marts (anonymous access blocked).
+CREATE POLICY "authenticated_mart_read" ON mart.mart_inventory_onhand
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_stockout_risk
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_overstock
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_expiry_risk
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_fefo_pick_list
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_open_po
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_service_level
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_shipment_performance
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_shipment_daily
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_return_analysis
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_return_daily
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_pnl_revenue
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_pnl_cogs
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_pnl_gross_margin
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_pnl_variable_cost
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_pnl_contribution
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_pnl_operating_profit
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_pnl_waterfall_summary
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_reco_inventory_movement
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_reco_oms_vs_wms
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_reco_erp_gr_vs_wms_receipt
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_reco_settlement_vs_estimated
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_reco_charges_invoice_vs_allocated
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_constraint_signals
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_constraint_root_cause
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_constraint_action_plan
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_constraint_effectiveness
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_coverage_period
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_forecast_accuracy
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_demand_plan
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_replenishment_plan
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_lead_time_analysis
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
+CREATE POLICY "authenticated_mart_read" ON mart.mart_model_performance
+  FOR SELECT USING (public.current_app_role() IN ('admin','scm','pnl','ops','readonly'));
 
 -- Sensitive cost allocation detail stays role-based.
 CREATE POLICY "charge_allocation_read" ON mart.mart_charge_allocated
