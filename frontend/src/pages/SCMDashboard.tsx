@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState } from "react";
 import ErrorBoundary from "../components/common/ErrorBoundary";
 import GlobalFilter from "../components/common/GlobalFilter";
+import ScmOverview from "../components/scm/ScmOverview";
 
 const InventoryOnhand = lazy(() => import("../components/scm/InventoryOnhand"));
 const StockoutRisk = lazy(() => import("../components/scm/StockoutRisk"));
@@ -64,6 +65,10 @@ export default function SCMDashboard() {
       </div>
 
       <GlobalFilter />
+
+      <ErrorBoundary>
+        <ScmOverview />
+      </ErrorBoundary>
 
       <div className="md:hidden">
         <select

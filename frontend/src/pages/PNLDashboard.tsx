@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState } from "react";
 import ErrorBoundary from "../components/common/ErrorBoundary";
 import GlobalFilter from "../components/common/GlobalFilter";
+import PnlOverview from "../components/pnl/PnlOverview";
 
 const Revenue = lazy(() => import("../components/pnl/Revenue"));
 const COGS = lazy(() => import("../components/pnl/COGS"));
@@ -64,6 +65,10 @@ export default function PNLDashboard() {
       </div>
 
       <GlobalFilter />
+
+      <ErrorBoundary>
+        <PnlOverview />
+      </ErrorBoundary>
 
       <div className="md:hidden">
         <select
