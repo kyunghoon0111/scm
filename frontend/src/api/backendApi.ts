@@ -52,6 +52,15 @@ export async function fetchJob(jobId: string) {
   return response.json() as Promise<BackendJobDetail>;
 }
 
+export async function fetchRecentJobs(limit = 20) {
+  const response = await fetch(`${API_URL}/api/jobs?limit=${limit}`);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Failed to fetch recent jobs.");
+  }
+  return response.json() as Promise<{ items: BackendJobSummary[] }>;
+}
+
 export async function uploadRawBatches(items: RawUploadBatchItem[]) {
   const response = await fetch(`${API_URL}/api/uploads/raw`, {
     method: "POST",
