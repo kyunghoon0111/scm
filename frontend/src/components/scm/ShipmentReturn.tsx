@@ -84,20 +84,20 @@ export default function ShipmentReturn() {
   );
 
   if (shipmentQuery.isLoading || returnQuery.isLoading) {
-    return <div className="p-8 text-center text-gray-400">출고·반품 데이터를 불러오는 중입니다...</div>;
+    return <div className="p-8 text-center text-gray-400">출고와 반품 데이터를 불러오는 중입니다...</div>;
   }
 
   if (shipmentQuery.error || returnQuery.error) {
     return (
       <ErrorState
-        title="출고·반품 데이터를 불러오지 못했습니다."
-        message="출고/반품 업로드 여부와 조회조건을 다시 확인해 주세요."
+        title="출고/반품 데이터를 불러오지 못했습니다."
+        message="출고/반품 업로드 상태와 조회 조건을 다시 확인해 주세요."
       />
     );
   }
 
   if (shipments.length === 0 && returns.length === 0) {
-    return <EmptyState message="현재 조회기간에는 출고·반품 데이터가 없습니다." />;
+    return <EmptyState message="현재 조회기간에는 출고와 반품 데이터가 없습니다." />;
   }
 
   return (
@@ -116,7 +116,7 @@ export default function ShipmentReturn() {
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <h3 className="text-sm font-semibold text-gray-800">{timeGrainLabel(groupBy)} 기준 출고 추이</h3>
-              <p className="mt-1 text-xs text-gray-500">조회기간 출고량을 원하는 단위로 묶어 비교합니다.</p>
+              <p className="mt-1 text-xs text-gray-500">조회기간 출고량을 선택한 단위로 묶어 비교합니다.</p>
             </div>
             <ChartGrainControl value={groupBy} onChange={setGroupBy} />
           </div>

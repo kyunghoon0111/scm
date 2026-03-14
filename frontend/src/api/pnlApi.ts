@@ -39,11 +39,13 @@ function wrap<T>(data: T[] | null, error: unknown): ApiResponse<T[]> {
     .map((row) => (row as Record<string, unknown>).coverage_flag)
     .filter((flag): flag is string => typeof flag === "string");
   const coverageFlag =
-    coverageValues.length > 0 && coverageValues.every((flag) => flag === "ACTUAL")
-      ? "ACTUAL"
-      : coverageValues.length > 0
-        ? "PARTIAL"
-        : "NO_DATA";
+    rows.length === 0
+      ? "NO_DATA"
+      : coverageValues.length === 0
+        ? "ACTUAL"
+        : coverageValues.every((flag) => flag === "ACTUAL")
+          ? "ACTUAL"
+          : "PARTIAL";
 
   return {
     success: true,

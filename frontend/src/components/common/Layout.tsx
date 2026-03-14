@@ -38,15 +38,15 @@ export default function Layout({ children }: { children: ReactNode }) {
     <div className="app-shell flex h-screen">
       <aside
         className={`app-sidebar hidden transition-all duration-200 md:flex md:flex-col ${
-          sidebarCollapsed ? "w-16" : "w-56"
+          sidebarCollapsed ? "w-16" : "w-64"
         }`}
       >
         <div className="flex items-center justify-between border-b border-white/10 p-4">
           {!sidebarCollapsed && (
             <div>
               <p className="eyebrow">운영 대시보드</p>
-              <h1 className="mt-1 text-base font-bold text-white">싱글핀 데스크</h1>
-              <p className="text-xs text-slate-300">SCM · P&amp;L 통합 운영 화면</p>
+              <h1 className="mt-1 text-base font-bold text-white">SCM Ops Desk</h1>
+              <p className="text-xs text-slate-300">공급망과 손익을 한 화면에서 운영합니다.</p>
             </div>
           )}
           <button
@@ -78,7 +78,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="app-header flex h-16 items-center justify-between border-b border-black/5 px-4 md:px-6">
           <div className="flex items-center gap-4">
-            <span className="text-sm font-bold text-gray-900 md:hidden">싱글핀 데스크</span>
+            <span className="text-sm font-bold text-gray-900 md:hidden">SCM Ops Desk</span>
             <span className="rounded-full bg-white/80 px-3 py-1 text-sm text-gray-500 shadow-sm">
               조회기간 <strong className="text-gray-800">{fromDate}</strong> ~{" "}
               <strong className="text-gray-800">{toDate}</strong>

@@ -80,7 +80,7 @@ export default function OperatingProfit() {
     return (
       <ErrorState
         title="영업이익 데이터를 불러오지 못했습니다."
-        message="비용, 매출, 출고 업로드 상태와 현재 조회조건을 확인해 주세요."
+        message="비용, 매출, 출고 업로드 상태와 현재 조회조건을 다시 확인해 주세요."
       />
     );
   }
@@ -93,9 +93,9 @@ export default function OperatingProfit() {
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         <KpiCard title="영업이익" value={kpis.totalProfit} unit="KRW" coverageFlag={meta?.coverage_flag ?? null} />
-        <KpiCard title="보완 필요 비중" value={kpis.partialRatio} coverageFlag={meta?.coverage_flag ?? null} />
-        <KpiCard title="흑자 행 수" value={kpis.profitableCount} unit="건" />
-        <KpiCard title="적자 행 수" value={kpis.lossCount} unit="건" />
+        <KpiCard title="일부 누락 비중" value={kpis.partialRatio} coverageFlag={meta?.coverage_flag ?? null} />
+        <KpiCard title="흑자 SKU" value={kpis.profitableCount} unit="건" />
+        <KpiCard title="적자 SKU" value={kpis.lossCount} unit="건" />
         <KpiCard title="평균 이익률" value={kpis.avgMargin !== null ? `${(kpis.avgMargin * 100).toFixed(1)}%` : null} />
       </div>
 
@@ -104,7 +104,7 @@ export default function OperatingProfit() {
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <h3 className="text-sm font-semibold text-gray-800">{timeGrainLabel(groupBy)} 기준 영업이익 추이</h3>
-              <p className="mt-1 text-xs text-gray-500">조회기간 손익을 집계 단위별로 다시 묶어 추세를 봅니다.</p>
+              <p className="mt-1 text-xs text-gray-500">조회기간 손익을 선택한 단위로 묶어 추세를 비교합니다.</p>
             </div>
             <ChartGrainControl value={groupBy} onChange={setGroupBy} />
           </div>

@@ -14,12 +14,12 @@ type EditableMapping = {
 
 const DATASET_LABELS: Record<string, { label: string; description: string }> = {
   upload_inventory_snapshot: { label: "재고 스냅샷", description: "현재고, 판매가능재고, 보류재고를 받습니다." },
-  upload_purchase_order: { label: "발주", description: "발주번호, 공급처, 예정입고일을 받습니다." },
+  upload_purchase_order: { label: "발주", description: "발주 번호, 공급처, 예상 입고일을 받습니다." },
   upload_receipt: { label: "입고", description: "실제 입고 수량과 검수 결과를 받습니다." },
-  upload_shipment: { label: "출고", description: "출고일, 주문 연결, 배송 정보를 받습니다." },
-  upload_return: { label: "반품", description: "반품 수량, 사유, 환불 정보를 받습니다." },
+  upload_shipment: { label: "출고", description: "출고 이력과 주문 연결, 배송 정보를 받습니다." },
+  upload_return: { label: "반품", description: "반품 수량, 사유, 처리 구분을 받습니다." },
   upload_sales: { label: "매출/정산", description: "총매출, 할인, 환불, 수수료를 받습니다." },
-  upload_charge: { label: "비용", description: "물류비, 3PL, 플랫폼 비용을 받습니다." },
+  upload_charge: { label: "비용", description: "운송비, 3PL, 플랫폼 비용 전표를 받습니다." },
 };
 
 function emptyMapping(): EditableMapping {
@@ -70,6 +70,11 @@ export default function SettingsPage() {
     setMessage(null);
   }
 
+  function removeRow(index: number) {
+    setRows((current) => current.filter((_, rowIndex) => rowIndex !== index));
+    setMessage(null);
+  }
+
   async function handleSave() {
     const validRows = rows.filter((row) => row.source_name.trim() && row.canonical_name.trim());
     if (validRows.length === 0) {
@@ -92,9 +97,11 @@ export default function SettingsPage() {
       <div className="hero-panel">
         <p className="eyebrow relative z-10">설정</p>
         <div className="relative z-10 mt-3 max-w-3xl">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 md:text-4xl">업로드 헤더를 시스템 컬럼에 연결합니다.</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 md:text-4xl">
+            업로드 헤더를 표준 컬럼에 연결합니다.
+          </h1>
           <p className="mt-3 text-sm leading-6 text-gray-600 md:text-base">
-            원본 파일마다 컬럼명이 조금씩 달라도 여기서 한 번만 맞춰두면 업로드 화면에서 자동으로 인식합니다.
+            실제 파일 헤더가 조금씩 달라도 한 번만 매핑해 두면 다음부터는 업로드 화면에서 자동으로 인식합니다.
           </p>
         </div>
       </div>
@@ -106,22 +113,31 @@ export default function SettingsPage() {
           <p className="mt-1 text-sm text-gray-500">재고, 발주, 입고, 출고, 반품, 매출, 비용</p>
         </div>
         <div className="panel-card">
-          <p className="text-xs uppercase tracking-[0.18em] text-gray-500">등록된 매핑</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-gray-500">저장된 매핑</p>
           <p className="mt-2 text-3xl font-semibold text-gray-900">{mappings.length}</p>
-          <p className="mt-1 text-sm text-gray-500">자주 들어오는 원본 헤더를 미리 연결해 둔 개수</p>
+          <p className="mt-1 text-sm text-gray-500">자주 들어오는 파일 헤더를 미리 연결해 둔 개수</p>
         </div>
         <div className="panel-card">
-          <p className="text-xs uppercase tracking-[0.18em] text-gray-500">시스템 컬럼</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-gray-500">표준 컬럼</p>
           <p className="mt-2 text-3xl font-semibold text-gray-900">{canonicalColumns.length}</p>
-          <p className="mt-1 text-sm text-gray-500">업로드 엔진이 이해하는 표준 컬럼 수</p>
+          <p className="mt-1 text-sm text-gray-500">업로드 엔진이 이해하는 공식 컬럼 수</p>
         </div>
       </section>
 
       <section className="panel-card space-y-4">
+        <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-4 text-sm text-gray-600">
+          <p className="font-semibold text-gray-900">운영자가 주로 하는 일</p>
+          <ul className="mt-2 space-y-1">
+            <li>1. 파일 헤더가 다르면 여기서 한 번 매핑하고 다시 업로드합니다.</li>
+            <li>2. 공통으로 쓰는 헤더는 `공통`으로 두고, 특정 파일만 쓰면 적용 대상을 지정합니다.</li>
+            <li>3. 저장 후에는 업로드 화면에서 자동 판별 정확도가 올라갑니다.</li>
+          </ul>
+        </div>
+
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h2 className="text-base font-semibold text-gray-900">컬럼 매핑 관리</h2>
-            <p className="mt-1 text-sm text-gray-500">원본 헤더명이 어떤 시스템 컬럼으로 들어갈지 지정합니다.</p>
+            <p className="mt-1 text-sm text-gray-500">파일 헤더와 표준 컬럼을 연결합니다. 저장 즉시 다음 업로드부터 반영됩니다.</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -146,18 +162,14 @@ export default function SettingsPage() {
           </div>
         ) : null}
 
-        <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-3 text-sm text-gray-600">
-          예: 원본 파일에 <code>SKU</code> 가 오면 시스템 컬럼 <code>item_id</code> 로, <code>실매출</code> 이 오면
-          <code> net_revenue</code> 대신 <code>gross_sales / discounts / refunds</code> 구조에 맞게 나눠서 넣어야 합니다.
-        </div>
-
         <div className="overflow-x-auto rounded-2xl border border-black/5">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[840px] text-sm">
             <thead>
               <tr className="bg-stone-50 text-left text-gray-600">
-                <th className="px-4 py-3">원본 헤더</th>
-                <th className="px-4 py-3">시스템 컬럼</th>
+                <th className="px-4 py-3">파일 헤더</th>
+                <th className="px-4 py-3">표준 컬럼</th>
                 <th className="px-4 py-3">적용 대상</th>
+                <th className="px-4 py-3 text-right">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -168,7 +180,7 @@ export default function SettingsPage() {
                       value={row.source_name}
                       onChange={(event) => updateRow(index, "source_name", event.target.value)}
                       className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-orange-300"
-                      placeholder="예: SKU, ITEM_CD, 실매출"
+                      placeholder="예: SKU, ITEM_CD, net_sales"
                     />
                   </td>
                   <td className="px-4 py-3">
@@ -193,12 +205,20 @@ export default function SettingsPage() {
                       ))}
                     </select>
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => removeRow(index)}
+                      className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-gray-600 transition hover:border-red-300 hover:text-red-700"
+                    >
+                      삭제
+                    </button>
+                  </td>
                 </tr>
               ))}
 
               {!isLoading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
                     아직 저장된 매핑이 없습니다.
                   </td>
                 </tr>
@@ -208,43 +228,47 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      <section className="panel-card space-y-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">시스템 컬럼 참고</h2>
-            <p className="mt-1 text-sm text-gray-500">검색해서 어떤 표준 컬럼을 써야 하는지 빠르게 확인합니다.</p>
+      <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="panel-card space-y-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">표준 컬럼 찾기</h2>
+              <p className="mt-1 text-sm text-gray-500">헤더 이름이 헷갈릴 때 먼저 표준 컬럼을 찾고, 그다음 위 표에 매핑하면 됩니다.</p>
+            </div>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-orange-300 md:max-w-xs"
+              placeholder="컬럼 검색"
+            />
           </div>
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-orange-300 md:max-w-xs"
-            placeholder="컬럼 검색"
-          />
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {filteredCanonicalColumns.map((key) => (
+              <div key={key} className="rounded-2xl border border-black/5 bg-white px-4 py-4">
+                <p className="text-sm font-semibold text-gray-900">{key}</p>
+                <p className="mt-1 text-xs text-gray-500">{prettyCanonicalName(key)}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filteredCanonicalColumns.map((key) => (
-            <div key={key} className="rounded-2xl border border-black/5 bg-white px-4 py-4">
-              <p className="text-sm font-semibold text-gray-900">{key}</p>
-              <p className="mt-1 text-xs text-gray-500">{prettyCanonicalName(key)}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel-card space-y-4">
-        <div>
-          <h2 className="text-base font-semibold text-gray-900">현재 업로드 유형</h2>
-          <p className="mt-1 text-sm text-gray-500">어떤 파일을 받을 수 있는지 한눈에 확인합니다.</p>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {UPLOAD_DATASETS.map((dataset) => (
-            <div key={dataset.raw_table_name} className="rounded-2xl border border-black/5 bg-white px-4 py-4">
-              <p className="text-sm font-semibold text-gray-900">{DATASET_LABELS[dataset.raw_table_name]?.label ?? dataset.raw_table_name}</p>
-              <p className="mt-1 text-xs text-gray-500">{DATASET_LABELS[dataset.raw_table_name]?.description ?? dataset.raw_table_name}</p>
-              <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-orange-700">{dataset.raw_table_name}</p>
-            </div>
-          ))}
+        <div className="panel-card space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">지원 파일 유형</h2>
+            <p className="mt-1 text-sm text-gray-500">어떤 파일이 어떤 업무를 담당하는지 바로 알 수 있게 정리했습니다.</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {UPLOAD_DATASETS.map((dataset) => (
+              <div key={dataset.raw_table_name} className="rounded-2xl border border-black/5 bg-white px-4 py-4">
+                <p className="text-sm font-semibold text-gray-900">{DATASET_LABELS[dataset.raw_table_name]?.label ?? dataset.raw_table_name}</p>
+                <p className="mt-1 text-xs leading-5 text-gray-500">
+                  {DATASET_LABELS[dataset.raw_table_name]?.description ?? dataset.raw_table_name}
+                </p>
+                <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-orange-700">{dataset.raw_table_name}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </div>

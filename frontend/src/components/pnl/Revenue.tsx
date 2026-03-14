@@ -117,7 +117,7 @@ export default function Revenue() {
     return (
       <ErrorState
         title="매출 데이터를 불러오지 못했습니다."
-        message="조회기간이나 채널 필터를 바꾸거나, 매출·정산 업로드 상태를 확인해 주세요."
+        message="조회기간이나 채널 필터를 바꾸거나, 매출/정산 업로드 상태를 확인해 주세요."
       />
     );
   }
@@ -143,7 +143,7 @@ export default function Revenue() {
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <h3 className="text-sm font-semibold text-gray-800">채널별 순매출 추이</h3>
-              <p className="mt-1 text-xs text-gray-500">조회기간 데이터를 {timeGrainLabel(groupBy)} 단위로 묶어서 보여줍니다.</p>
+              <p className="mt-1 text-xs text-gray-500">조회기간 데이터를 {timeGrainLabel(groupBy)} 단위로 묶어 보여줍니다.</p>
             </div>
             <ChartGrainControl value={groupBy} onChange={setGroupBy} />
           </div>
@@ -181,13 +181,13 @@ export default function Revenue() {
               <Tooltip
                 formatter={(value, _name, props) => [
                   fmtKrw(Number(value)),
-                  (props as { payload?: { partial?: boolean } })?.payload?.partial ? "보완 필요 데이터 포함" : "순매출",
+                  (props as { payload?: { partial?: boolean } })?.payload?.partial ? "일부 누락 데이터 포함" : "순매출",
                 ]}
               />
               <Bar dataKey="net_revenue_krw" name="순매출" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-          <p className="mt-1 text-xs text-gray-400">보완 필요 상태가 섞인 국가는 실제보다 보수적으로 보일 수 있습니다.</p>
+          <p className="mt-1 text-xs text-gray-400">일부 누락 상태가 있는 국가는 실제보다 보수적으로 보일 수 있습니다.</p>
         </div>
       )}
 
