@@ -21,6 +21,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+STALE_LOCK_MINUTES = 15
 
 
 def seed_dim_charge_policy(con, config: AppConfig) -> None:
@@ -39,12 +40,32 @@ def seed_dim_charge_policy(con, config: AppConfig) -> None:
 
 def acquire_lock(con) -> int:
     """Acquire batch lock. Returns batch_id."""
-    lock = con.execute("SELECT locked, pid FROM raw.system_batch_lock WHERE lock_id = 1").fetchone()
+    lock = con.execute("SELECT locked, pid, started_at FROM raw.system_batch_lock WHERE lock_id = 1").fetchone()
     if lock and lock[0]:
-        raise RuntimeError(
-            f"Pipeline is locked by PID {lock[1]}. "
-            f"If the previous run crashed, use: python run.py --unlock"
-        )
+        started_at = lock[2]
+        now = datetime.now(timezone.utc)
+        if started_at is not None:
+            if started_at.tzinfo is None:
+                started_at = started_at.replace(tzinfo=timezone.utc)
+            lock_age_seconds = (now - started_at).total_seconds()
+            if lock_age_seconds >= STALE_LOCK_MINUTES * 60:
+                logger.warning(
+                    "Detected stale pipeline lock from PID %s started at %s; auto-releasing after %.1f minutes.",
+                    lock[1],
+                    started_at.isoformat(),
+                    lock_age_seconds / 60,
+                )
+                con.execute(
+                    "UPDATE raw.system_batch_lock SET locked = false, pid = NULL, started_at = NULL WHERE lock_id = 1"
+                )
+                lock = (False, None, None)
+
+        if lock[0]:
+            started_label = started_at.isoformat() if started_at else "unknown"
+            raise RuntimeError(
+                f"Pipeline is locked by PID {lock[1]} since {started_label}. "
+                f"If the previous run crashed, use: python run.py --unlock"
+            )
 
     now = datetime.now(timezone.utc)
     pid = os.getpid()
