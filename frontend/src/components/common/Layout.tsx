@@ -1,6 +1,5 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { timeGrainLabel } from "../../lib/timeGrain";
 import { useAuthStore } from "../../store/authStore";
 import { useFilterStore } from "../../store/filterStore";
 import MobileTabBar from "./MobileTabBar";
@@ -30,7 +29,7 @@ const NAV_ITEMS: NavItem[] = [
 export default function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { user, role, permissions, signOut } = useAuthStore();
-  const { fromDate, toDate, groupBy } = useFilterStore();
+  const { fromDate, toDate } = useFilterStore();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const visibleNav = NAV_ITEMS.filter((item) => permissions.includes(item.permission));
@@ -47,7 +46,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             <div>
               <p className="eyebrow">운영 대시보드</p>
               <h1 className="mt-1 text-base font-bold text-white">싱글핀 데스크</h1>
-              <p className="text-xs text-slate-300">SCM · P&amp;L 통합 화면</p>
+              <p className="text-xs text-slate-300">SCM · P&amp;L 통합 운영 화면</p>
             </div>
           )}
           <button
@@ -58,6 +57,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             {sidebarCollapsed ? "\u25B6" : "\u25C0"}
           </button>
         </div>
+
         <nav className="flex-1 space-y-0.5 p-2">
           {visibleNav.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
@@ -81,10 +81,10 @@ export default function Layout({ children }: { children: ReactNode }) {
             <span className="text-sm font-bold text-gray-900 md:hidden">싱글핀 데스크</span>
             <span className="rounded-full bg-white/80 px-3 py-1 text-sm text-gray-500 shadow-sm">
               조회기간 <strong className="text-gray-800">{fromDate}</strong> ~{" "}
-              <strong className="text-gray-800">{toDate}</strong> ·{" "}
-              <strong className="text-gray-800">{timeGrainLabel(groupBy)}</strong>
+              <strong className="text-gray-800">{toDate}</strong>
             </span>
           </div>
+
           <div className="flex items-center gap-2 md:gap-4">
             {user && (
               <span className="text-xs text-gray-600 md:text-sm">

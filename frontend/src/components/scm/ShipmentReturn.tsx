@@ -4,6 +4,7 @@ import { useReturnAnalysis, useShipmentDaily } from "../../api/scmApi";
 import { bucketDate, timeGrainLabel } from "../../lib/timeGrain";
 import { useFilterStore } from "../../store/filterStore";
 import type { ReturnAnalysisRow, ShipmentDailyRow } from "../../types/scm";
+import ChartGrainControl from "../common/ChartGrainControl";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
 import ErrorState from "../common/ErrorState";
@@ -15,7 +16,7 @@ function fmtQty(value: number | null | undefined): string {
 }
 
 export default function ShipmentReturn() {
-  const { fromDate, toDate, groupBy, warehouseId, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, groupBy, setGroupBy, warehouseId, itemId, channelStoreId } = useFilterStore();
   const shipmentQuery = useShipmentDaily({
     from_date: fromDate,
     to_date: toDate,
@@ -83,20 +84,20 @@ export default function ShipmentReturn() {
   );
 
   if (shipmentQuery.isLoading || returnQuery.isLoading) {
-    return <div className="p-8 text-center text-gray-400">출고/반품 데이터를 불러오는 중입니다...</div>;
+    return <div className="p-8 text-center text-gray-400">출고·반품 데이터를 불러오는 중입니다...</div>;
   }
 
   if (shipmentQuery.error || returnQuery.error) {
     return (
       <ErrorState
-        title="출고/반품 데이터를 불러오지 못했습니다."
-        message="mart 권한과 기준월, 창고, 채널 필터를 확인해 주세요."
+        title="출고·반품 데이터를 불러오지 못했습니다."
+        message="출고/반품 업로드 여부와 조회조건을 다시 확인해 주세요."
       />
     );
   }
 
   if (shipments.length === 0 && returns.length === 0) {
-    return <EmptyState message="현재 기준월에 출고/반품 데이터가 없습니다." />;
+    return <EmptyState message="현재 조회기간에는 출고·반품 데이터가 없습니다." />;
   }
 
   return (
@@ -112,9 +113,12 @@ export default function ShipmentReturn() {
 
       {chartData.length > 0 && (
         <div className="panel-card-strong">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-gray-800">{timeGrainLabel(groupBy)} 기준 출고 흐름</h3>
-            <p className="mt-1 text-xs text-gray-500">선택한 집계축 기준으로 출고량 추이를 다시 묶어서 보여줍니다.</p>
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">{timeGrainLabel(groupBy)} 기준 출고 추이</h3>
+              <p className="mt-1 text-xs text-gray-500">조회기간 출고량을 원하는 단위로 묶어 비교합니다.</p>
+            </div>
+            <ChartGrainControl value={groupBy} onChange={setGroupBy} />
           </div>
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={chartData}>
@@ -133,7 +137,7 @@ export default function ShipmentReturn() {
           <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
             <div>
               <h3 className="text-sm font-semibold text-gray-800">출고 일자별 상세</h3>
-              <p className="text-xs text-gray-500">창고 기준 출고 흐름과 주문 수를 같이 보여줍니다.</p>
+              <p className="text-xs text-gray-500">창고 기준 출고 흐름과 주문 수를 함께 봅니다.</p>
             </div>
             {metaFlag && <CoverageBadge flag={metaFlag} />}
           </div>
@@ -168,7 +172,7 @@ export default function ShipmentReturn() {
         <div className="panel-table">
           <div className="border-b border-black/5 px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-800">반품 사유 요약</h3>
-            <p className="text-xs text-gray-500">반품 사유와 반품률을 함께 봅니다.</p>
+            <p className="text-xs text-gray-500">반품 사유별 건수와 반품률을 함께 봅니다.</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -186,9 +190,7 @@ export default function ShipmentReturn() {
                     <td className="px-4 py-2">{row.reason}</td>
                     <td className="px-4 py-2 text-right">{row.returnCount.toLocaleString()}</td>
                     <td className="px-4 py-2 text-right font-medium">{row.qtyReturned.toLocaleString()}</td>
-                    <td className="px-4 py-2 text-right">
-                      {row.returnRate !== null ? `${(row.returnRate * 100).toFixed(1)}%` : "-"}
-                    </td>
+                    <td className="px-4 py-2 text-right">{row.returnRate !== null ? `${(row.returnRate * 100).toFixed(1)}%` : "-"}</td>
                   </tr>
                 ))}
               </tbody>

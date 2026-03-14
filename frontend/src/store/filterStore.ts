@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { recommendTimeGrain } from "../lib/timeGrain";
 
 function formatDate(date: Date): string {
   const yyyy = date.getFullYear();
@@ -37,25 +38,37 @@ interface FilterState {
   setSnapshotDate: (date: string | null) => void;
 }
 
+function syncPeriod(fromDate: string, toDate: string) {
+  return {
+    period: toDate.slice(0, 7),
+    groupBy: recommendTimeGrain(fromDate, toDate),
+    timeGrain: recommendTimeGrain(fromDate, toDate),
+  };
+}
+
+const initialFromDate = formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+const initialToDate = formatDate(new Date());
+const initialGrain = recommendTimeGrain(initialFromDate, initialToDate);
+
 export const useFilterStore = create<FilterState>((set) => ({
-  fromDate: formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
-  toDate: formatDate(new Date()),
-  groupBy: "month",
+  fromDate: initialFromDate,
+  toDate: initialToDate,
+  groupBy: initialGrain,
   period: getCurrentPeriod(),
-  timeGrain: "month",
+  timeGrain: initialGrain,
   warehouseId: null,
   itemId: null,
   channelStoreId: null,
   snapshotDate: null,
   setFromDate: (fromDate) =>
-    set(() => ({
+    set((state) => ({
       fromDate,
-      period: fromDate.slice(0, 7),
+      ...syncPeriod(fromDate, state.toDate),
     })),
   setToDate: (toDate) =>
-    set(() => ({
+    set((state) => ({
       toDate,
-      period: toDate.slice(0, 7),
+      ...syncPeriod(state.fromDate, toDate),
     })),
   setGroupBy: (groupBy) => set({ groupBy, timeGrain: groupBy }),
   setPeriod: (period) =>
@@ -66,7 +79,13 @@ export const useFilterStore = create<FilterState>((set) => ({
       if (!year || !month) return { period };
       const start = `${yearText}-${monthText}-01`;
       const end = formatDate(new Date(year, month, 0));
-      return { period, fromDate: start, toDate: end };
+      return {
+        period,
+        fromDate: start,
+        toDate: end,
+        groupBy: "month",
+        timeGrain: "month",
+      };
     }),
   setTimeGrain: (timeGrain) => set({ timeGrain, groupBy: timeGrain }),
   setWarehouseId: (warehouseId) => set({ warehouseId }),

@@ -12,9 +12,10 @@ import {
   YAxis,
 } from "recharts";
 import { useRevenue } from "../../api/pnlApi";
-import { bucketPeriod } from "../../lib/timeGrain";
+import { bucketPeriod, timeGrainLabel } from "../../lib/timeGrain";
 import { useFilterStore } from "../../store/filterStore";
 import type { RevenueRow } from "../../types/pnl";
+import ChartGrainControl from "../common/ChartGrainControl";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
 import ErrorState from "../common/ErrorState";
@@ -26,7 +27,7 @@ function fmtKrw(value: number | null | undefined): string {
 }
 
 export default function Revenue() {
-  const { fromDate, toDate, groupBy, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, groupBy, setGroupBy, itemId, channelStoreId } = useFilterStore();
   const { data: resp, isLoading, error } = useRevenue({
     from_date: fromDate,
     to_date: toDate,
@@ -50,7 +51,6 @@ export default function Revenue() {
     const netRevenue = rows.some((row) => row.net_revenue_krw !== null)
       ? rows.reduce((sum, row) => sum + (row.net_revenue_krw ?? 0), 0)
       : null;
-
     const netMargin = grossSales && grossSales > 0 && netRevenue !== null ? (netRevenue / grossSales) * 100 : null;
     const channelCount = new Set(rows.map((row) => row.channel_store_id ?? "UNKNOWN")).size;
     const countryCount = new Set(rows.map((row) => row.country ?? "UNKNOWN")).size;
@@ -69,10 +69,7 @@ export default function Revenue() {
 
       const periodKey = bucketPeriod(row.period, groupBy);
       const channelMap = byPeriodChannel.get(periodKey) ?? new Map<string, number>();
-      channelMap.set(
-        channelId,
-        (channelMap.get(channelId) ?? 0) + row.net_revenue_krw,
-      );
+      channelMap.set(channelId, (channelMap.get(channelId) ?? 0) + row.net_revenue_krw);
       byPeriodChannel.set(periodKey, channelMap);
     }
 
@@ -114,50 +111,28 @@ export default function Revenue() {
 
   const lineColors = ["#2563eb", "#ef4444", "#16a34a", "#f59e0b", "#7c3aed", "#0891b2"];
 
-  if (isLoading) {
-    return <div className="p-8 text-center text-gray-400">불러오는 중...</div>;
-  }
+  if (isLoading) return <div className="p-8 text-center text-gray-400">매출 데이터를 불러오는 중입니다...</div>;
 
   if (error) {
     return (
       <ErrorState
         title="매출 데이터를 불러오지 못했습니다."
-        message="mart 접근 권한이나 현재 조회 필터를 확인해 주세요."
+        message="조회기간이나 채널 필터를 바꾸거나, 매출·정산 업로드 상태를 확인해 주세요."
       />
     );
   }
 
   if (rows.length === 0) {
-    return <EmptyState message="현재 필터에 맞는 매출 데이터가 없습니다." />;
+    return <EmptyState message="현재 조건에 맞는 매출 데이터가 없습니다." />;
   }
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-7">
-        <KpiCard
-          title="총매출"
-          value={kpis.grossSales}
-          unit="KRW"
-          coverageFlag={meta?.coverage_flag ?? null}
-        />
-        <KpiCard
-          title="할인"
-          value={kpis.discounts}
-          unit="KRW"
-          coverageFlag={meta?.coverage_flag ?? null}
-        />
-        <KpiCard
-          title="환불"
-          value={kpis.refunds}
-          unit="KRW"
-          coverageFlag={meta?.coverage_flag ?? null}
-        />
-        <KpiCard
-          title="순매출"
-          value={kpis.netRevenue}
-          unit="KRW"
-          coverageFlag={meta?.coverage_flag ?? null}
-        />
+        <KpiCard title="총매출" value={kpis.grossSales} unit="KRW" coverageFlag={meta?.coverage_flag ?? null} />
+        <KpiCard title="할인" value={kpis.discounts} unit="KRW" coverageFlag={meta?.coverage_flag ?? null} />
+        <KpiCard title="환불" value={kpis.refunds} unit="KRW" coverageFlag={meta?.coverage_flag ?? null} />
+        <KpiCard title="순매출" value={kpis.netRevenue} unit="KRW" coverageFlag={meta?.coverage_flag ?? null} />
         <KpiCard title="순매출률" value={kpis.netMargin !== null ? `${kpis.netMargin.toFixed(1)}%` : null} />
         <KpiCard title="채널 수" value={kpis.channelCount} unit="개" />
         <KpiCard title="국가 수" value={kpis.countryCount} unit="개" />
@@ -165,7 +140,13 @@ export default function Revenue() {
 
       {trendData.data.length > 0 && (
         <div className="panel-card-strong">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">채널별 매출</h3>
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">채널별 순매출 추이</h3>
+              <p className="mt-1 text-xs text-gray-500">조회기간 데이터를 {timeGrainLabel(groupBy)} 단위로 묶어서 보여줍니다.</p>
+            </div>
+            <ChartGrainControl value={groupBy} onChange={setGroupBy} />
+          </div>
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={trendData.data}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -191,7 +172,7 @@ export default function Revenue() {
 
       {byCountry.length > 0 && (
         <div className="panel-card-strong">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">국가별 매출</h3>
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">국가별 순매출</h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={byCountry}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -200,17 +181,13 @@ export default function Revenue() {
               <Tooltip
                 formatter={(value, _name, props) => [
                   fmtKrw(Number(value)),
-                  (props as { payload?: { partial?: boolean } })?.payload?.partial
-                    ? "부분 데이터 포함"
-                    : "순매출",
+                  (props as { payload?: { partial?: boolean } })?.payload?.partial ? "보완 필요 데이터 포함" : "순매출",
                 ]}
               />
               <Bar dataKey="net_revenue_krw" name="순매출" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-          <p className="mt-1 text-xs text-gray-400">
-            부분 데이터가 섞여 있으면 총액이 실제보다 작게 보일 수 있습니다.
-          </p>
+          <p className="mt-1 text-xs text-gray-400">보완 필요 상태가 섞인 국가는 실제보다 보수적으로 보일 수 있습니다.</p>
         </div>
       )}
 
@@ -232,16 +209,14 @@ export default function Revenue() {
                 <th className="px-4 py-2 text-right">할인</th>
                 <th className="px-4 py-2 text-right">환불</th>
                 <th className="px-4 py-2 text-right">순매출</th>
-                <th className="px-4 py-2">커버리지</th>
+                <th className="px-4 py-2">상태</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, index) => (
                 <tr
                   key={`${row.period}-${row.item_id}-${row.channel_store_id}-${index}`}
-                  className={`border-t border-gray-100 hover:bg-gray-50 ${
-                    row.coverage_flag !== "ACTUAL" ? "bg-orange-50" : ""
-                  }`}
+                  className={`border-t border-gray-100 hover:bg-gray-50 ${row.coverage_flag !== "ACTUAL" ? "bg-orange-50" : ""}`}
                 >
                   <td className="px-4 py-2">{row.period ?? "-"}</td>
                   <td className="px-4 py-2 font-mono text-xs">{row.item_id ?? "-"}</td>

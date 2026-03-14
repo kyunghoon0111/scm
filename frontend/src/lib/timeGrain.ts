@@ -19,6 +19,18 @@ export function timeGrainLabel(timeGrain: TimeGrain) {
   }
 }
 
+export function recommendTimeGrain(fromDate: string, toDate: string): TimeGrain {
+  const start = new Date(`${fromDate}T00:00:00`);
+  const end = new Date(`${toDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return "month";
+
+  const diffDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+  if (diffDays <= 31) return "day";
+  if (diffDays <= 120) return "week";
+  if (diffDays <= 730) return "month";
+  return "year";
+}
+
 export function bucketDate(dateText: string | null | undefined, timeGrain: TimeGrain): string {
   if (!dateText) return "-";
   const normalized = dateText.slice(0, 10);
