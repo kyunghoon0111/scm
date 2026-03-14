@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { useOperatingProfit } from "../../api/pnlApi";
+import { bucketPeriod } from "../../lib/timeGrain";
 import { useFilterStore } from "../../store/filterStore";
 import type { OperatingProfitRow } from "../../types/pnl";
 import CoverageBadge from "../common/CoverageBadge";
@@ -29,7 +30,7 @@ function fmtPct(value: number | null | undefined): string {
 }
 
 export default function OperatingProfit() {
-  const { period, itemId, channelStoreId } = useFilterStore();
+  const { period, timeGrain, itemId, channelStoreId } = useFilterStore();
   const { data: resp, isLoading, error } = useOperatingProfit({
     period,
     item_id: itemId,
@@ -65,7 +66,7 @@ export default function OperatingProfit() {
     const byPeriod = new Map<string, number>();
 
     for (const row of rows) {
-      const periodKey = row.period ?? "-";
+      const periodKey = bucketPeriod(row.period, timeGrain);
       byPeriod.set(periodKey, (byPeriod.get(periodKey) ?? 0) + (row.operating_profit_krw ?? 0));
     }
 
@@ -75,7 +76,7 @@ export default function OperatingProfit() {
         period: currentPeriod,
         operating_profit: operatingProfit,
       }));
-  }, [rows]);
+  }, [rows, timeGrain]);
 
   if (isLoading) {
     return <div className="p-8 text-center text-gray-400">불러오는 중...</div>;

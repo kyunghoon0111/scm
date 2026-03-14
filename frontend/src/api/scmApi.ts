@@ -22,6 +22,10 @@ import type {
   RecoChargesRow,
   ConstraintSignalRow,
   CoveragePeriodRow,
+  ForecastAccuracyRow,
+  DemandPlanRow,
+  ReplenishmentPlanRow,
+  LeadTimePredictionRow,
 } from "../types/scm";
 
 // ── 공통 ──
@@ -89,6 +93,8 @@ const TABLES_WITH_PERIOD = new Set([
   "mart_constraint_action_plan",
   "mart_constraint_effectiveness",
   "mart_coverage_period",
+  "mart_forecast_accuracy",
+  "mart_lead_time_analysis",
 ]);
 
 function applyFilters(
@@ -460,5 +466,83 @@ export function useCoverage(params: ScmParams) {
     queryKey: ["coverage", params],
     queryFn: () => fetchCoverage(params),
     ...QUERY_CONFIG.coverage,
+  });
+}
+
+async function fetchForecastAccuracy(params: ScmParams) {
+  const { data, error } = await applyFilters(
+    fromMart("mart_forecast_accuracy"),
+    params,
+    "mart_forecast_accuracy",
+  );
+  return wrap<ForecastAccuracyRow>(data, error);
+}
+
+async function fetchDemandPlan(params: ScmParams) {
+  let query = fromMart("mart_demand_plan").select("*");
+  if (params.item_id) query = query.eq("item_id", params.item_id);
+  if (params.warehouse_id) query = query.eq("warehouse_id", params.warehouse_id);
+
+  if (params.period) {
+    const range = getPeriodRange(params.period);
+    if (range) query = query.gte("plan_date", range.start).lt("plan_date", range.end);
+  }
+
+  const { data, error } = await query.order("plan_date", { ascending: true });
+  return wrap<DemandPlanRow>(data, error);
+}
+
+async function fetchReplenishmentPlan(params: ScmParams) {
+  let query = fromMart("mart_replenishment_plan").select("*");
+  if (params.item_id) query = query.eq("item_id", params.item_id);
+  if (params.warehouse_id) query = query.eq("warehouse_id", params.warehouse_id);
+
+  if (params.period) {
+    const range = getPeriodRange(params.period);
+    if (range) query = query.gte("plan_date", range.start).lt("plan_date", range.end);
+  }
+
+  const { data, error } = await query.order("plan_date", { ascending: true });
+  return wrap<ReplenishmentPlanRow>(data, error);
+}
+
+async function fetchLeadTimePrediction(params: ScmParams) {
+  const { data, error } = await applyFilters(
+    fromMart("mart_lead_time_analysis"),
+    params,
+    "mart_lead_time_analysis",
+  );
+  return wrap<LeadTimePredictionRow>(data, error);
+}
+
+export function useForecastAccuracy(params: ScmParams) {
+  return useQuery({
+    queryKey: ["scm", "forecast-accuracy", params],
+    queryFn: () => fetchForecastAccuracy(params),
+    ...QUERY_CONFIG.turnover,
+  });
+}
+
+export function useDemandPlan(params: ScmParams) {
+  return useQuery({
+    queryKey: ["scm", "demand-plan", params],
+    queryFn: () => fetchDemandPlan(params),
+    ...QUERY_CONFIG.turnover,
+  });
+}
+
+export function useReplenishmentPlan(params: ScmParams) {
+  return useQuery({
+    queryKey: ["scm", "replenishment-plan", params],
+    queryFn: () => fetchReplenishmentPlan(params),
+    ...QUERY_CONFIG.turnover,
+  });
+}
+
+export function useLeadTimePrediction(params: ScmParams) {
+  return useQuery({
+    queryKey: ["scm", "lead-time-prediction", params],
+    queryFn: () => fetchLeadTimePrediction(params),
+    ...QUERY_CONFIG.turnover,
   });
 }

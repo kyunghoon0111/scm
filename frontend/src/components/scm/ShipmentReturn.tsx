@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useReturnAnalysis, useShipmentDaily } from "../../api/scmApi";
+import { bucketDate, timeGrainLabel } from "../../lib/timeGrain";
 import { useFilterStore } from "../../store/filterStore";
 import type { ReturnAnalysisRow, ShipmentDailyRow } from "../../types/scm";
 import CoverageBadge from "../common/CoverageBadge";
@@ -14,7 +15,7 @@ function fmtQty(value: number | null | undefined): string {
 }
 
 export default function ShipmentReturn() {
-  const { period, warehouseId, itemId, channelStoreId } = useFilterStore();
+  const { period, timeGrain, warehouseId, itemId, channelStoreId } = useFilterStore();
   const shipmentQuery = useShipmentDaily({
     period,
     warehouse_id: warehouseId,
@@ -38,28 +39,20 @@ export default function ShipmentReturn() {
     const shippedBasis = returns.reduce((sum, row) => sum + (row.qty_shipped ?? 0), 0);
     const overallReturnRate = shippedBasis > 0 ? totalReturnedQty / shippedBasis : null;
     const avgDailyShipment = shipments.length > 0 ? totalShipmentQty / shipments.length : null;
-    const reasonCount = new Set(returns.map((row) => row.reason).filter(Boolean)).size;
-
-    return {
-      totalShipmentQty,
-      totalShipmentCount,
-      totalReturnedQty,
-      totalReturnCount,
-      overallReturnRate,
-      avgDailyShipment,
-      reasonCount,
-    };
+    return { totalShipmentQty, totalShipmentCount, totalReturnedQty, totalReturnCount, overallReturnRate, avgDailyShipment };
   }, [shipments, returns]);
 
   const chartData = useMemo(
     () =>
-      [...shipments]
-        .sort((left, right) => (left.ship_date < right.ship_date ? -1 : 1))
-        .map((row) => ({
-          date: row.ship_date,
-          shippedQty: row.qty_shipped,
-        })),
-    [shipments],
+      Object.values(
+        shipments.reduce<Record<string, { date: string; shippedQty: number }>>((acc, row) => {
+          const bucket = bucketDate(row.ship_date, timeGrain);
+          if (!acc[bucket]) acc[bucket] = { date: bucket, shippedQty: 0 };
+          acc[bucket].shippedQty += row.qty_shipped;
+          return acc;
+        }, {}),
+      ).sort((left, right) => (left.date < right.date ? -1 : 1)),
+    [shipments, timeGrain],
   );
 
   const returnReasonRows = useMemo(
@@ -95,13 +88,13 @@ export default function ShipmentReturn() {
     return (
       <ErrorState
         title="출고/반품 데이터를 불러오지 못했습니다."
-        message="mart 뷰 권한과 기준월, 창고, 채널 필터를 확인해 주세요."
+        message="mart 권한과 기준월, 창고, 채널 필터를 확인해 주세요."
       />
     );
   }
 
   if (shipments.length === 0 && returns.length === 0) {
-    return <EmptyState message="현재 필터에 맞는 출고/반품 데이터가 없습니다." />;
+    return <EmptyState message="현재 기준월에 출고/반품 데이터가 없습니다." />;
   }
 
   return (
@@ -111,15 +104,15 @@ export default function ShipmentReturn() {
         <KpiCard title="출고 건수" value={kpis.totalShipmentCount} unit="건" />
         <KpiCard title="반품 수량" value={kpis.totalReturnedQty} unit="EA" />
         <KpiCard title="반품 건수" value={kpis.totalReturnCount} unit="건" />
-        <KpiCard title="전체 반품률" value={kpis.overallReturnRate !== null ? `${(kpis.overallReturnRate * 100).toFixed(1)}%` : null} />
+        <KpiCard title="반품률" value={kpis.overallReturnRate !== null ? `${(kpis.overallReturnRate * 100).toFixed(1)}%` : null} />
         <KpiCard title="일평균 출고" value={kpis.avgDailyShipment !== null ? kpis.avgDailyShipment.toFixed(1) : null} unit="EA" />
       </div>
 
       {chartData.length > 0 && (
         <div className="panel-card-strong">
           <div className="mb-4">
-            <h3 className="text-sm font-semibold text-gray-800">일자별 출고 흐름</h3>
-            <p className="mt-1 text-xs text-gray-500">기준월 내 일자별 출고 수량 변화를 확인할 수 있습니다.</p>
+            <h3 className="text-sm font-semibold text-gray-800">{timeGrainLabel(timeGrain)} 기준 출고 흐름</h3>
+            <p className="mt-1 text-xs text-gray-500">선택한 집계축 기준으로 출고량 추이를 다시 묶어서 보여줍니다.</p>
           </div>
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={chartData}>
@@ -138,7 +131,7 @@ export default function ShipmentReturn() {
           <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
             <div>
               <h3 className="text-sm font-semibold text-gray-800">출고 일자별 상세</h3>
-              <p className="text-xs text-gray-500">창고 기준 출고량과 주문 수를 함께 보여줍니다.</p>
+              <p className="text-xs text-gray-500">창고 기준 출고 흐름과 주문 수를 같이 보여줍니다.</p>
             </div>
             {metaFlag && <CoverageBadge flag={metaFlag} />}
           </div>
@@ -173,7 +166,7 @@ export default function ShipmentReturn() {
         <div className="panel-table">
           <div className="border-b border-black/5 px-4 py-3">
             <h3 className="text-sm font-semibold text-gray-800">반품 사유 요약</h3>
-            <p className="text-xs text-gray-500">반품량이 큰 사유부터 우선 확인할 수 있습니다.</p>
+            <p className="text-xs text-gray-500">반품 사유와 반품률을 함께 봅니다.</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -198,9 +191,6 @@ export default function ShipmentReturn() {
                 ))}
               </tbody>
             </table>
-          </div>
-          <div className="border-t border-black/5 px-4 py-3 text-xs text-gray-500">
-            반품 사유 수: {kpis.reasonCount}개
           </div>
         </div>
       </div>

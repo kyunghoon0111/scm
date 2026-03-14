@@ -215,3 +215,55 @@ export interface CoveragePeriodRow {
   severity: string;
   is_closed_period: boolean;
 }
+
+export interface ForecastAccuracyRow {
+  period: string;
+  item_id: string;
+  warehouse_id: string | null;
+  forecast_method: string;
+  actual_qty: number | null;
+  forecast_qty: number | null;
+  error_qty: number | null;
+  abs_error: number | null;
+  mape: number | null;
+  bias: number | null;
+  accuracy_pct: number | null;
+}
+
+export interface DemandPlanRow {
+  item_id: string;
+  warehouse_id: string | null;
+  plan_date: string;
+  forecast_30d: number | null;
+  forecast_60d: number | null;
+  forecast_90d: number | null;
+  safety_stock_qty: number | null;
+  reorder_point: number | null;
+  confidence_level: number | null;
+  forecast_method: string | null;
+}
+
+export interface ReplenishmentPlanRow {
+  item_id: string;
+  warehouse_id: string | null;
+  plan_date: string;
+  current_stock: number | null;
+  reorder_point: number | null;
+  safety_stock: number | null;
+  recommended_order_qty: number | null;
+  urgency: string | null;
+  forecast_method: string | null;
+}
+
+export interface LeadTimePredictionRow {
+  period: string;
+  supplier_id: string;
+  item_id: string | null;
+  actual_lead_days_avg: number | null;
+  actual_lead_days_p50: number | null;
+  actual_lead_days_p90: number | null;
+  predicted_lead_days_avg: number | null;
+  prediction_error_days: number | null;
+  late_po_ratio: number | null;
+  total_po_count: number | null;
+}

@@ -8,6 +8,8 @@ const StockoutRisk = lazy(() => import("../components/scm/StockoutRisk"));
 const OpenPO = lazy(() => import("../components/scm/OpenPO"));
 const LeadTime = lazy(() => import("../components/scm/LeadTime"));
 const ShipmentReturn = lazy(() => import("../components/scm/ShipmentReturn"));
+const ConstraintOverview = lazy(() => import("../components/scm/ConstraintOverview"));
+const ForecastOverview = lazy(() => import("../components/scm/ForecastOverview"));
 
 interface Tab {
   key: string;
@@ -20,6 +22,8 @@ const TABS: Tab[] = [
   { key: "open-po", label: "미입고 발주" },
   { key: "lead-time", label: "리드타임" },
   { key: "shipment-return", label: "출고/반품" },
+  { key: "constraint", label: "병목 현황" },
+  { key: "forecast", label: "예측" },
 ];
 
 function renderTabContent(tab: string) {
@@ -34,12 +38,12 @@ function renderTabContent(tab: string) {
       return <LeadTime />;
     case "shipment-return":
       return <ShipmentReturn />;
+    case "constraint":
+      return <ConstraintOverview />;
+    case "forecast":
+      return <ForecastOverview />;
     default:
-      return (
-        <div className="flex h-64 items-center justify-center">
-          <p className="text-lg text-gray-400">아직 준비되지 않은 화면입니다.</p>
-        </div>
-      );
+      return <div className="flex h-64 items-center justify-center text-gray-400">준비 중입니다.</div>;
   }
 }
 
@@ -56,10 +60,10 @@ export default function SCMDashboard() {
         <p className="eyebrow relative z-10">공급망</p>
         <div className="relative z-10 mt-3 max-w-3xl">
           <h2 className="text-3xl font-semibold tracking-tight text-gray-900 md:text-4xl">
-            재고부터 리드타임, 출고와 반품까지 공급망 지표를 한 화면에서 살펴봅니다.
+            재고부터 리드타임, 출고와 반품, 병목과 예측까지 한 화면에서 살펴봅니다.
           </h2>
           <p className="mt-3 text-sm leading-6 text-gray-600 md:text-base">
-            지금 당장 필요한 재고와 품절 신호는 물론, 입고 지연과 물류 흐름까지 주제별 탭으로 나눠 빠르게 확인할 수 있게 구성했습니다.
+            재고 현황만 보는 수준을 넘어서 병목 신호와 보충 발주 추천까지 같은 흐름에서 확인할 수 있게 묶었습니다.
           </p>
         </div>
       </div>

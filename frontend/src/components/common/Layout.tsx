@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { timeGrainLabel } from "../../lib/timeGrain";
 import { useAuthStore } from "../../store/authStore";
 import { useFilterStore } from "../../store/filterStore";
 import MobileTabBar from "./MobileTabBar";
@@ -15,7 +16,7 @@ const ROLE_LABELS: Record<string, string> = {
   scm: "SCM",
   pnl: "P&L",
   ops: "운영",
-  readonly: "읽기 전용",
+  readonly: "조회 전용",
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -30,6 +31,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { user, role, permissions, signOut } = useAuthStore();
   const period = useFilterStore((s) => s.period);
+  const timeGrain = useFilterStore((s) => s.timeGrain);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const visibleNav = NAV_ITEMS.filter((item) => permissions.includes(item.permission));
@@ -46,7 +48,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             <div>
               <p className="eyebrow">운영 대시보드</p>
               <h1 className="mt-1 text-base font-bold text-white">시그널 데스크</h1>
-              <p className="text-xs text-slate-300">SCM &middot; P&amp;L 통합 화면</p>
+              <p className="text-xs text-slate-300">SCM · P&amp;L 통합 화면</p>
             </div>
           )}
           <button
@@ -79,7 +81,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-4">
             <span className="text-sm font-bold text-gray-900 md:hidden">시그널 데스크</span>
             <span className="rounded-full bg-white/80 px-3 py-1 text-sm text-gray-500 shadow-sm">
-              기준월: <strong className="text-gray-800">{period}</strong>
+              기준월: <strong className="text-gray-800">{period}</strong> · <strong className="text-gray-800">{timeGrainLabel(timeGrain)}</strong>
             </span>
           </div>
           <div className="flex items-center gap-2 md:gap-4">

@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { useRevenue } from "../../api/pnlApi";
+import { bucketPeriod } from "../../lib/timeGrain";
 import { useFilterStore } from "../../store/filterStore";
 import type { RevenueRow } from "../../types/pnl";
 import CoverageBadge from "../common/CoverageBadge";
@@ -25,7 +26,7 @@ function fmtKrw(value: number | null | undefined): string {
 }
 
 export default function Revenue() {
-  const { period, itemId, channelStoreId } = useFilterStore();
+  const { period, timeGrain, itemId, channelStoreId } = useFilterStore();
   const { data: resp, isLoading, error } = useRevenue({
     period,
     item_id: itemId,
@@ -65,7 +66,7 @@ export default function Revenue() {
       const channelId = row.channel_store_id ?? "UNKNOWN";
       channels.add(channelId);
 
-      const periodKey = row.period ?? "-";
+      const periodKey = bucketPeriod(row.period, timeGrain);
       const channelMap = byPeriodChannel.get(periodKey) ?? new Map<string, number>();
       channelMap.set(
         channelId,
@@ -88,7 +89,7 @@ export default function Revenue() {
         return entry;
       }),
     };
-  }, [rows]);
+  }, [rows, timeGrain]);
 
   const byCountry = useMemo(() => {
     const grouped = new Map<string, { total: number; partial: boolean }>();
