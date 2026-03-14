@@ -32,6 +32,7 @@ MIGRATIONS = [
     "migrations/13_phase2_upload_contracts.sql",
     "migrations/14_public_mart_access.sql",
     "migrations/15_public_settings_read.sql",
+    "migrations/16_upload_dedup_index.sql",
 ]
 
 

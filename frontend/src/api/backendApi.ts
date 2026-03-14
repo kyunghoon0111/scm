@@ -23,6 +23,8 @@ export interface RawUploadBatchResult {
   table_name: string;
   file_name: string;
   inserted_count: number;
+  skipped_count: number;
+  duplicate: boolean;
   error: string | null;
 }
 

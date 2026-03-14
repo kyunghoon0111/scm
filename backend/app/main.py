@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import uuid
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -387,12 +388,90 @@ def run_command(command: list[str], *, timeout_seconds: int) -> dict[str, Any]:
         }
 
 
-def insert_upload_rows(table_name: str, rows: list[dict[str, Any]]) -> int:
+def _normalize_hash_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _normalize_hash_value(value[key]) for key in sorted(value)}
+    if isinstance(value, list):
+        return [_normalize_hash_value(item) for item in value]
+    if isinstance(value, float):
+        return round(value, 6)
+    return value
+
+
+def build_upload_hash(table_name: str, rows: list[dict[str, Any]], ordered_columns: list[str]) -> str:
+    comparable_rows = []
+    ignored_columns = {"batch_id", "source_file_name", "source_row_no"}
+
+    for row in rows:
+        comparable_rows.append(
+            {
+                column: _normalize_hash_value(row.get(column))
+                for column in ordered_columns
+                if column not in ignored_columns
+            }
+        )
+
+    payload = {"table_name": table_name, "rows": comparable_rows}
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def find_existing_upload(file_hash: str, table_name: str) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT batch_id, file_name, row_count, status, processed_at
+                FROM raw.system_file_log
+                WHERE file_hash = %s
+                  AND table_name = %s
+                  AND status IN ('success', 'duplicate')
+                ORDER BY processed_at DESC
+                LIMIT 1
+                """,
+                [file_hash, table_name],
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            return {
+                "batch_id": row[0],
+                "file_name": row[1],
+                "row_count": row[2],
+                "status": row[3],
+                "processed_at": row[4].isoformat() if row[4] else None,
+            }
+
+
+def log_upload_file(
+    *,
+    batch_id: int,
+    file_name: str,
+    file_hash: str,
+    table_name: str,
+    row_count: int,
+    status: str,
+    error_msg: str | None = None,
+) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO raw.system_file_log
+                  (batch_id, file_name, file_hash, table_name, row_count, status, error_msg, processed_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                """,
+                [batch_id, file_name, file_hash, table_name, row_count, status, error_msg],
+            )
+            conn.commit()
+
+
+def insert_upload_rows(table_name: str, file_name: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
     allowed_columns = UPLOAD_TABLE_COLUMNS.get(table_name)
     if allowed_columns is None:
         raise ValueError(f"Unsupported upload table: {table_name}")
     if not rows:
-        return 0
+        return {"inserted_count": 0, "skipped_count": 0, "duplicate": False, "file_hash": None}
 
     sanitized_rows: list[dict[str, Any]] = []
     ordered_columns: list[str] = []
@@ -407,7 +486,35 @@ def insert_upload_rows(table_name: str, rows: list[dict[str, Any]]) -> int:
                 ordered_columns.append(key)
 
     if not sanitized_rows or not ordered_columns:
-        return 0
+        return {"inserted_count": 0, "skipped_count": 0, "duplicate": False, "file_hash": None}
+
+    batch_id = next(
+        (
+            int(row["batch_id"])
+            for row in sanitized_rows
+            if row.get("batch_id") is not None
+        ),
+        int(datetime.now(timezone.utc).timestamp()),
+    )
+    file_hash = build_upload_hash(table_name, sanitized_rows, ordered_columns)
+    existing = find_existing_upload(file_hash, table_name)
+    if existing is not None:
+        log_upload_file(
+            batch_id=batch_id,
+            file_name=file_name,
+            file_hash=file_hash,
+            table_name=table_name,
+            row_count=len(sanitized_rows),
+            status="duplicate",
+            error_msg=f"Duplicate upload skipped. Existing batch_id={existing['batch_id']}",
+        )
+        return {
+            "inserted_count": 0,
+            "skipped_count": len(sanitized_rows),
+            "duplicate": True,
+            "file_hash": file_hash,
+            "existing_batch_id": existing["batch_id"],
+        }
 
     values = [[row.get(column) for column in ordered_columns] for row in sanitized_rows]
 
@@ -420,7 +527,20 @@ def insert_upload_rows(table_name: str, rows: list[dict[str, Any]]) -> int:
         with conn.cursor() as cur:
             extras.execute_values(cur, query, values, page_size=500)
             conn.commit()
-    return len(sanitized_rows)
+    log_upload_file(
+        batch_id=batch_id,
+        file_name=file_name,
+        file_hash=file_hash,
+        table_name=table_name,
+        row_count=len(sanitized_rows),
+        status="success",
+    )
+    return {
+        "inserted_count": len(sanitized_rows),
+        "skipped_count": 0,
+        "duplicate": False,
+        "file_hash": file_hash,
+    }
 
 
 def execute_finalize_job(job_id: str) -> None:
@@ -514,12 +634,14 @@ def upload_raw_batches(payload: UploadBatchRequest):
 
     for item in payload.items:
         try:
-            inserted = insert_upload_rows(item.table_name, item.rows)
+            upload_result = insert_upload_rows(item.table_name, item.file_name, item.rows)
             results.append(
                 {
                     "table_name": item.table_name,
                     "file_name": item.file_name,
-                    "inserted_count": inserted,
+                    "inserted_count": upload_result["inserted_count"],
+                    "skipped_count": upload_result["skipped_count"],
+                    "duplicate": upload_result["duplicate"],
                     "error": None,
                 }
             )
@@ -529,6 +651,8 @@ def upload_raw_batches(payload: UploadBatchRequest):
                     "table_name": item.table_name,
                     "file_name": item.file_name,
                     "inserted_count": 0,
+                    "skipped_count": len(item.rows),
+                    "duplicate": False,
                     "error": str(exc),
                 }
             )

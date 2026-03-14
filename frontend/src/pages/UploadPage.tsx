@@ -127,7 +127,11 @@ export default function UploadPage() {
 
         const backendItem = backendMap.get(`${item.fileName}|${item.tableName}`);
         const insertedCount = backendItem?.inserted_count ?? 0;
+        const skippedCount = item.skippedCount + (backendItem?.skipped_count ?? 0);
         const errors = [...item.errors];
+        if (backendItem?.duplicate) {
+          errors.push("동일한 데이터 해시의 업로드가 이미 있어 이번 적재는 건너뛰었습니다.");
+        }
         if (backendItem?.error) {
           errors.push(backendItem.error);
         }
@@ -136,7 +140,7 @@ export default function UploadPage() {
           tableName: item.tableName,
           fileName: item.fileName,
           insertedCount,
-          skippedCount: item.skippedCount,
+          skippedCount,
           errors: errors.slice(0, 20),
         };
       });
