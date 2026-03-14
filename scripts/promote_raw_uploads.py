@@ -25,6 +25,7 @@ PROMOTIONS = [
         "name": "inventory_snapshot",
         "raw_table": "raw.upload_inventory_snapshot",
         "core_table": "core.fact_inventory_snapshot",
+        "conflict_columns": ["snapshot_date", "warehouse_id", "item_id", "lot_id"],
         "columns": [
             "snapshot_date",
             "warehouse_id",
@@ -55,6 +56,7 @@ PROMOTIONS = [
                 raw_id::text AS source_pk
             FROM raw.upload_inventory_snapshot
             {where_clause}
+            ORDER BY batch_id DESC, raw_id DESC
         """,
         "select_params": [SENTINEL_NONE],
         "conflict": "(snapshot_date, warehouse_id, item_id, lot_id)",
@@ -74,6 +76,7 @@ PROMOTIONS = [
         "name": "purchase_order",
         "raw_table": "raw.upload_purchase_order",
         "core_table": "core.fact_po",
+        "conflict_columns": ["po_id", "item_id"],
         "columns": [
             "po_id",
             "po_date",
@@ -106,6 +109,7 @@ PROMOTIONS = [
                 raw_id::text AS source_pk
             FROM raw.upload_purchase_order
             {where_clause}
+            ORDER BY batch_id DESC, raw_id DESC
         """,
         "select_params": [],
         "conflict": "(po_id, item_id)",
@@ -128,6 +132,7 @@ PROMOTIONS = [
         "name": "receipt",
         "raw_table": "raw.upload_receipt",
         "core_table": "core.fact_receipt",
+        "conflict_columns": ["receipt_id", "item_id"],
         "columns": [
             "receipt_id",
             "receipt_date",
@@ -162,6 +167,7 @@ PROMOTIONS = [
                 raw_id::text AS source_pk
             FROM raw.upload_receipt
             {where_clause}
+            ORDER BY batch_id DESC, raw_id DESC
         """,
         "select_params": [],
         "conflict": "(receipt_id, item_id)",
@@ -185,6 +191,7 @@ PROMOTIONS = [
         "name": "shipment",
         "raw_table": "raw.upload_shipment",
         "core_table": "core.fact_shipment",
+        "conflict_columns": ["shipment_id", "item_id", "lot_id"],
         "columns": [
             "shipment_id",
             "ship_date",
@@ -219,6 +226,7 @@ PROMOTIONS = [
                 raw_id::text AS source_pk
             FROM raw.upload_shipment
             {where_clause}
+            ORDER BY batch_id DESC, raw_id DESC
         """,
         "select_params": [SENTINEL_NONE],
         "conflict": "(shipment_id, item_id, lot_id)",
@@ -241,6 +249,7 @@ PROMOTIONS = [
         "name": "return",
         "raw_table": "raw.upload_return",
         "core_table": "core.fact_return",
+        "conflict_columns": ["return_id", "item_id", "lot_id"],
         "columns": [
             "return_id",
             "return_date",
@@ -273,6 +282,7 @@ PROMOTIONS = [
                 raw_id::text AS source_pk
             FROM raw.upload_return
             {where_clause}
+            ORDER BY batch_id DESC, raw_id DESC
         """,
         "select_params": [SENTINEL_NONE],
         "conflict": "(return_id, item_id, lot_id)",
@@ -294,6 +304,7 @@ PROMOTIONS = [
         "name": "sales",
         "raw_table": "raw.upload_sales",
         "core_table": "core.fact_settlement",
+        "conflict_columns": ["settlement_id", "line_no"],
         "columns": [
             "settlement_id",
             "line_no",
@@ -330,6 +341,7 @@ PROMOTIONS = [
                 raw_id::text AS source_pk
             FROM raw.upload_sales
             {where_clause}
+            ORDER BY batch_id DESC, raw_id DESC
         """,
         "select_params": [],
         "conflict": "(settlement_id, line_no)",
@@ -354,6 +366,7 @@ PROMOTIONS = [
         "name": "charge",
         "raw_table": "raw.upload_charge",
         "core_table": "core.fact_charge_actual",
+        "conflict_columns": ["invoice_no", "invoice_line_no", "charge_type"],
         "columns": [
             "invoice_no",
             "invoice_line_no",
@@ -396,6 +409,7 @@ PROMOTIONS = [
                 raw_id::text AS source_pk
             FROM raw.upload_charge
             {where_clause}
+            ORDER BY batch_id DESC, raw_id DESC
         """,
         "select_params": [],
         "conflict": "(invoice_no, invoice_line_no, charge_type)",
@@ -430,7 +444,20 @@ def fetch_rows(cur, promotion: dict, batch_id: int | None) -> list[tuple]:
 
     sql = promotion["select_sql"].format(where_clause=where_clause)
     cur.execute(sql, params)
-    return cur.fetchall()
+    rows = cur.fetchall()
+
+    deduped_rows: list[tuple] = []
+    seen_keys: set[tuple] = set()
+    key_indexes = [promotion["columns"].index(column) for column in promotion["conflict_columns"]]
+
+    for row in rows:
+        key = tuple(row[index] for index in key_indexes)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        deduped_rows.append(row)
+
+    return deduped_rows
 
 
 def upsert_rows(cur, promotion: dict, rows: list[tuple]) -> int:
