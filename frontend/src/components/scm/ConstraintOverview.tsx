@@ -8,9 +8,10 @@ import ErrorState from "../common/ErrorState";
 import KpiCard from "../common/KpiCard";
 
 export default function ConstraintOverview() {
-  const { period, warehouseId, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, warehouseId, itemId, channelStoreId } = useFilterStore();
   const { data: resp, isLoading, error } = useConstraintSignals({
-    period,
+    from_date: fromDate,
+    to_date: toDate,
     warehouse_id: warehouseId,
     item_id: itemId,
     channel: channelStoreId,

@@ -4,14 +4,14 @@ import { useFilterStore } from "../../store/filterStore";
 import KpiCard from "../common/KpiCard";
 
 export default function ScmOverview() {
-  const { period, warehouseId, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, warehouseId, itemId, channelStoreId } = useFilterStore();
 
-  const inventory = useInventoryOnhand({ period, warehouse_id: warehouseId, item_id: itemId });
-  const stockout = useStockoutRisk({ period, warehouse_id: warehouseId, item_id: itemId });
-  const openPo = useOpenPO({ period, warehouse_id: warehouseId, item_id: itemId });
-  const shipments = useShipmentDaily({ period, warehouse_id: warehouseId, item_id: itemId });
-  const returns = useReturnAnalysis({ period, warehouse_id: warehouseId, item_id: itemId, channel: channelStoreId });
-  const coverage = useCoverage({ period, warehouse_id: warehouseId, item_id: itemId, channel: channelStoreId });
+  const inventory = useInventoryOnhand({ from_date: fromDate, to_date: toDate, warehouse_id: warehouseId, item_id: itemId });
+  const stockout = useStockoutRisk({ from_date: fromDate, to_date: toDate, warehouse_id: warehouseId, item_id: itemId });
+  const openPo = useOpenPO({ from_date: fromDate, to_date: toDate, warehouse_id: warehouseId, item_id: itemId });
+  const shipments = useShipmentDaily({ from_date: fromDate, to_date: toDate, warehouse_id: warehouseId, item_id: itemId });
+  const returns = useReturnAnalysis({ from_date: fromDate, to_date: toDate, warehouse_id: warehouseId, item_id: itemId, channel: channelStoreId });
+  const coverage = useCoverage({ from_date: fromDate, to_date: toDate, warehouse_id: warehouseId, item_id: itemId, channel: channelStoreId });
 
   const summary = useMemo(() => {
     const inventoryRows = inventory.data?.data ?? [];

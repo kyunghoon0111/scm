@@ -29,9 +29,10 @@ function weightedAverage(rows: LeadTimeRow[], picker: (row: LeadTimeRow) => numb
 }
 
 export default function LeadTime() {
-  const { period, itemId } = useFilterStore();
+  const { fromDate, toDate, itemId } = useFilterStore();
   const { data: resp, isLoading, error } = useLeadTime({
-    period,
+    from_date: fromDate,
+    to_date: toDate,
     item_id: itemId,
   });
 

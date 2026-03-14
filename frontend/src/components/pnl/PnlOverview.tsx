@@ -10,13 +10,13 @@ import { useFilterStore } from "../../store/filterStore";
 import KpiCard from "../common/KpiCard";
 
 export default function PnlOverview() {
-  const { period, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, itemId, channelStoreId } = useFilterStore();
 
-  const revenue = useRevenue({ period, item_id: itemId, channel_store_id: channelStoreId });
-  const cogs = useCOGS({ period, item_id: itemId, channel_store_id: channelStoreId });
-  const contribution = useContribution({ period, item_id: itemId, channel_store_id: channelStoreId });
-  const operatingProfit = useOperatingProfit({ period, item_id: itemId, channel_store_id: channelStoreId });
-  const ranking = useProfitabilityRanking({ period, item_id: itemId, channel_store_id: channelStoreId });
+  const revenue = useRevenue({ from_date: fromDate, to_date: toDate, item_id: itemId, channel_store_id: channelStoreId });
+  const cogs = useCOGS({ from_date: fromDate, to_date: toDate, item_id: itemId, channel_store_id: channelStoreId });
+  const contribution = useContribution({ from_date: fromDate, to_date: toDate, item_id: itemId, channel_store_id: channelStoreId });
+  const operatingProfit = useOperatingProfit({ from_date: fromDate, to_date: toDate, item_id: itemId, channel_store_id: channelStoreId });
+  const ranking = useProfitabilityRanking({ from_date: fromDate, to_date: toDate, item_id: itemId, channel_store_id: channelStoreId });
 
   const summary = useMemo(() => {
     const revenueRows = revenue.data?.data ?? [];

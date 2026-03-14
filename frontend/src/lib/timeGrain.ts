@@ -21,10 +21,11 @@ export function timeGrainLabel(timeGrain: TimeGrain) {
 
 export function bucketDate(dateText: string | null | undefined, timeGrain: TimeGrain): string {
   if (!dateText) return "-";
-  const date = new Date(`${dateText.slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return dateText;
+  const normalized = dateText.slice(0, 10);
+  const date = new Date(`${normalized}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return normalized;
 
-  if (timeGrain === "day") return dateText.slice(0, 10);
+  if (timeGrain === "day") return normalized;
   if (timeGrain === "month") return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
   if (timeGrain === "year") return String(date.getFullYear());
 

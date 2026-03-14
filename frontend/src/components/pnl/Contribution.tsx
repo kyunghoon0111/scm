@@ -14,9 +14,10 @@ function fmtKrw(value: number | null | undefined): string {
 }
 
 export default function Contribution() {
-  const { period, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, itemId, channelStoreId } = useFilterStore();
   const { data: resp, isLoading, error } = useContribution({
-    period,
+    from_date: fromDate,
+    to_date: toDate,
     item_id: itemId,
     channel_store_id: channelStoreId,
   });

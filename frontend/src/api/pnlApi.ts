@@ -19,10 +19,10 @@ import type {
   PnlCoverageRowLevel,
 } from "../types/pnl";
 
-// ── 공통 ──
-
 interface PnlParams {
   period?: string;
+  from_date?: string;
+  to_date?: string;
   item_id?: string | null;
   channel_store_id?: string | null;
   country?: string | null;
@@ -44,6 +44,7 @@ function wrap<T>(data: T[] | null, error: unknown): ApiResponse<T[]> {
       : coverageValues.length > 0
         ? "PARTIAL"
         : "NO_DATA";
+
   return {
     success: true,
     data: rows,
@@ -56,15 +57,39 @@ function wrap<T>(data: T[] | null, error: unknown): ApiResponse<T[]> {
   };
 }
 
-function applyPnlFilters(
-  query: ReturnType<typeof fromMart>,
-  params: PnlParams,
-) {
+function listPeriodsInRange(fromDate: string, toDate: string): string[] {
+  const start = new Date(`${fromDate}T00:00:00Z`);
+  const end = new Date(`${toDate}T00:00:00Z`);
+  const periods: string[] = [];
+  const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+
+  while (cursor <= end) {
+    const year = cursor.getUTCFullYear();
+    const month = String(cursor.getUTCMonth() + 1).padStart(2, "0");
+    periods.push(`${year}-${month}`);
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+
+  return periods;
+}
+
+function resolvePeriods(params: Pick<PnlParams, "period" | "from_date" | "to_date">): string[] {
+  if (params.from_date && params.to_date) {
+    return listPeriodsInRange(params.from_date, params.to_date);
+  }
+
+  return params.period ? [params.period] : [];
+}
+
+function applyPnlFilters(query: ReturnType<typeof fromMart>, params: PnlParams) {
   let q = query.select("*");
-  if (params.period) q = q.eq("period", params.period);
+  const periods = resolvePeriods(params);
+
+  if (periods.length === 1) q = q.eq("period", periods[0]);
+  else if (periods.length > 1) q = q.in("period", periods);
+
   if (params.item_id) q = q.eq("item_id", params.item_id);
-  if (params.channel_store_id)
-    q = q.eq("channel_store_id", params.channel_store_id);
+  if (params.channel_store_id) q = q.eq("channel_store_id", params.channel_store_id);
   if (params.country) q = q.eq("country", params.country);
   if (params.charge_domain) q = q.eq("charge_domain", params.charge_domain);
   if (params.charge_type) q = q.eq("charge_type", params.charge_type);
@@ -72,13 +97,8 @@ function applyPnlFilters(
   return q;
 }
 
-// ── 탭 1: 매출 ──
-
 async function fetchRevenue(params: PnlParams) {
-  const { data, error } = await applyPnlFilters(
-    fromMart("mart_pnl_revenue"),
-    params,
-  )
+  const { data, error } = await applyPnlFilters(fromMart("mart_pnl_revenue"), params)
     .order("net_revenue_krw", { ascending: false })
     .order("item_id", { ascending: true });
   return wrap<RevenueRow>(data, error);
@@ -92,13 +112,8 @@ export function useRevenue(params: PnlParams) {
   });
 }
 
-// ── 탭 2: 매출원가 (COGS) ──
-
 async function fetchCOGS(params: PnlParams) {
-  const { data, error } = await applyPnlFilters(
-    fromMart("mart_pnl_cogs"),
-    params,
-  )
+  const { data, error } = await applyPnlFilters(fromMart("mart_pnl_cogs"), params)
     .order("cogs_krw", { ascending: false, nullsFirst: false })
     .order("item_id", { ascending: true });
   return wrap<COGSRow>(data, error);
@@ -112,13 +127,8 @@ export function useCOGS(params: PnlParams) {
   });
 }
 
-// ── 탭 3: 매출총이익 ──
-
 async function fetchGrossMargin(params: PnlParams) {
-  const { data, error } = await applyPnlFilters(
-    fromMart("mart_pnl_gross_margin"),
-    params,
-  );
+  const { data, error } = await applyPnlFilters(fromMart("mart_pnl_gross_margin"), params);
   return wrap<GrossMarginRow>(data, error);
 }
 
@@ -130,13 +140,8 @@ export function useGrossMargin(params: PnlParams) {
   });
 }
 
-// ── 탭 4: 변동비 ──
-
 async function fetchVariableCost(params: PnlParams) {
-  const { data, error } = await applyPnlFilters(
-    fromMart("mart_pnl_variable_cost"),
-    params,
-  );
+  const { data, error } = await applyPnlFilters(fromMart("mart_pnl_variable_cost"), params);
   return wrap<VariableCostRow>(data, error);
 }
 
@@ -148,13 +153,8 @@ export function useVariableCost(params: PnlParams) {
   });
 }
 
-// ── 탭 5: 공헌이익 ──
-
 async function fetchContribution(params: PnlParams) {
-  const { data, error } = await applyPnlFilters(
-    fromMart("mart_pnl_contribution"),
-    params,
-  );
+  const { data, error } = await applyPnlFilters(fromMart("mart_pnl_contribution"), params);
   return wrap<ContributionRow>(data, error);
 }
 
@@ -166,13 +166,8 @@ export function useContribution(params: PnlParams) {
   });
 }
 
-// ── 탭 6: 영업이익 ──
-
 async function fetchOperatingProfit(params: PnlParams) {
-  const { data, error } = await applyPnlFilters(
-    fromMart("mart_pnl_operating_profit"),
-    params,
-  )
+  const { data, error } = await applyPnlFilters(fromMart("mart_pnl_operating_profit"), params)
     .order("operating_profit_krw", { ascending: false, nullsFirst: false })
     .order("item_id", { ascending: true });
   return wrap<OperatingProfitRow>(data, error);
@@ -186,13 +181,8 @@ export function useOperatingProfit(params: PnlParams) {
   });
 }
 
-// ── 탭 7: 손익폭포 ──
-
 async function fetchWaterfall(params: PnlParams) {
-  const { data, error } = await applyPnlFilters(
-    fromMart("mart_pnl_waterfall_summary"),
-    params,
-  );
+  const { data, error } = await applyPnlFilters(fromMart("mart_pnl_waterfall_summary"), params);
   return wrap<WaterfallStep>(data, error);
 }
 
@@ -204,14 +194,8 @@ export function useWaterfall(params: PnlParams) {
   });
 }
 
-// ── 탭 8: 수익성 순위 ──
-// v_profitability_ranking 뷰 사용 (migrations/10_views.sql)
-
 async function fetchProfitabilityRanking(params: PnlParams) {
-  const { data, error } = await applyPnlFilters(
-    fromMart("v_profitability_ranking"),
-    params,
-  );
+  const { data, error } = await applyPnlFilters(fromMart("v_profitability_ranking"), params);
   return wrap<ProfitabilityRow>(data, error);
 }
 
@@ -223,13 +207,8 @@ export function useProfitabilityRanking(params: PnlParams) {
   });
 }
 
-// ── 탭 9: 대사검증 — 정산 vs 추정 ──
-
 async function fetchPnlRecoSettlement(params: PnlParams) {
-  const { data, error } = await applyPnlFilters(
-    fromMart("mart_reco_settlement_vs_estimated"),
-    params,
-  );
+  const { data, error } = await applyPnlFilters(fromMart("mart_reco_settlement_vs_estimated"), params);
   return wrap<RecoSettlementRow>(data, error);
 }
 
@@ -241,13 +220,8 @@ export function usePnlRecoSettlement(params: PnlParams) {
   });
 }
 
-// ── 탭 9: 대사검증 — 배분 보존 ──
-
 async function fetchPnlRecoCharges(params: PnlParams) {
-  const { data, error } = await applyPnlFilters(
-    fromMart("mart_reco_charges_invoice_vs_allocated"),
-    params,
-  );
+  const { data, error } = await applyPnlFilters(fromMart("mart_reco_charges_invoice_vs_allocated"), params);
   return wrap<RecoChargesRow>(data, error);
 }
 
@@ -259,13 +233,8 @@ export function usePnlRecoCharges(params: PnlParams) {
   });
 }
 
-// ── 탭 10: 원가배분 ──
-
 async function fetchChargeAllocation(params: PnlParams) {
-  const { data, error } = await applyPnlFilters(
-    fromMart("mart_charge_allocated"),
-    params,
-  );
+  const { data, error } = await applyPnlFilters(fromMart("mart_charge_allocated"), params);
   return wrap<ChargeAllocationRow>(data, error);
 }
 
@@ -277,22 +246,17 @@ export function useChargeAllocation(params: PnlParams) {
   });
 }
 
-// ── 탭 11: P&L 데이터커버리지 ──
+async function fetchPnlCoverage(params: PnlParams): Promise<ApiResponse<PnlCoverageData>> {
+  const periods = resolvePeriods(params);
 
-async function fetchPnlCoverage(
-  params: PnlParams,
-): Promise<ApiResponse<PnlCoverageData>> {
-  // 도메인별 커버리지
-  const { data: domains, error: e1 } = await applyPnlFilters(
-    fromMart("mart_coverage_period"),
-    params,
-  );
+  const { data: domains, error: e1 } = await applyPnlFilters(fromMart("mart_coverage_period"), params);
   if (e1) throw e1;
 
-  // 행 수준 커버리지: mart별 actual/partial 비율
-  const { data: rowLevel, error: e2 } = await fromMart("v_pnl_coverage_row_level")
-    .select("*")
-    .eq("period", params.period ?? "");
+  let rowLevelQuery = fromMart("v_pnl_coverage_row_level").select("*");
+  if (periods.length === 1) rowLevelQuery = rowLevelQuery.eq("period", periods[0]);
+  else if (periods.length > 1) rowLevelQuery = rowLevelQuery.in("period", periods);
+
+  const { data: rowLevel, error: e2 } = await rowLevelQuery;
   if (e2) throw e2;
 
   const result: PnlCoverageData = {

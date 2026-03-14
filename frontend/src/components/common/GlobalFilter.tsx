@@ -1,62 +1,60 @@
 import { timeGrainLabel } from "../../lib/timeGrain";
 import { useFilterStore } from "../../store/filterStore";
 
-function generatePeriodOptions(): string[] {
-  const options: string[] = [];
-  const now = new Date();
-
-  for (let index = 0; index < 24; index += 1) {
-    const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    options.push(`${year}-${month}`);
-  }
-
-  return options;
-}
-
-const PERIOD_OPTIONS = generatePeriodOptions();
-const TIME_GRAINS = ["day", "week", "month", "year"] as const;
+const GROUP_BY_OPTIONS = ["day", "week", "month", "year"] as const;
 
 export default function GlobalFilter() {
   const {
-    period,
-    timeGrain,
+    fromDate,
+    toDate,
+    groupBy,
     warehouseId,
     itemId,
     channelStoreId,
-    setPeriod,
-    setTimeGrain,
+    setFromDate,
+    setToDate,
+    setGroupBy,
     setWarehouseId,
     setItemId,
     setChannelStoreId,
   } = useFilterStore();
 
   return (
-    <div className="filter-shell mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-      <div className="min-w-[10rem] flex-1">
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">기준월</label>
-        <select
-          value={period}
-          onChange={(event) => setPeriod(event.target.value)}
+    <div className="filter-shell mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <div className="min-w-[10rem]">
+        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+          조회 시작일
+        </label>
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(event) => setFromDate(event.target.value)}
           className="filter-control w-full"
-        >
-          {PERIOD_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+        />
       </div>
 
-      <div className="min-w-[8rem] sm:w-40">
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">집계축</label>
+      <div className="min-w-[10rem]">
+        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+          조회 종료일
+        </label>
+        <input
+          type="date"
+          value={toDate}
+          onChange={(event) => setToDate(event.target.value)}
+          className="filter-control w-full"
+        />
+      </div>
+
+      <div className="min-w-[8rem]">
+        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+          집계 단위
+        </label>
         <select
-          value={timeGrain}
-          onChange={(event) => setTimeGrain(event.target.value as typeof timeGrain)}
+          value={groupBy}
+          onChange={(event) => setGroupBy(event.target.value as typeof groupBy)}
           className="filter-control w-full"
         >
-          {TIME_GRAINS.map((option) => (
+          {GROUP_BY_OPTIONS.map((option) => (
             <option key={option} value={option}>
               {timeGrainLabel(option)}
             </option>
@@ -64,8 +62,10 @@ export default function GlobalFilter() {
         </select>
       </div>
 
-      <div className="min-w-[10rem] flex-1">
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">창고</label>
+      <div className="min-w-[10rem]">
+        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+          창고
+        </label>
         <input
           type="text"
           value={warehouseId ?? ""}
@@ -75,8 +75,10 @@ export default function GlobalFilter() {
         />
       </div>
 
-      <div className="min-w-[10rem] flex-1">
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">상품</label>
+      <div className="min-w-[10rem]">
+        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+          상품
+        </label>
         <input
           type="text"
           value={itemId ?? ""}
@@ -86,8 +88,10 @@ export default function GlobalFilter() {
         />
       </div>
 
-      <div className="min-w-[10rem] flex-1">
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">채널</label>
+      <div className="min-w-[10rem]">
+        <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+          채널
+        </label>
         <input
           type="text"
           value={channelStoreId ?? ""}

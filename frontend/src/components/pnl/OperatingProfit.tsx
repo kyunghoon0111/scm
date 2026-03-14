@@ -30,9 +30,10 @@ function fmtPct(value: number | null | undefined): string {
 }
 
 export default function OperatingProfit() {
-  const { period, timeGrain, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, groupBy, itemId, channelStoreId } = useFilterStore();
   const { data: resp, isLoading, error } = useOperatingProfit({
-    period,
+    from_date: fromDate,
+    to_date: toDate,
     item_id: itemId,
     channel_store_id: channelStoreId,
   });
@@ -66,7 +67,7 @@ export default function OperatingProfit() {
     const byPeriod = new Map<string, number>();
 
     for (const row of rows) {
-      const periodKey = bucketPeriod(row.period, timeGrain);
+      const periodKey = bucketPeriod(row.period, groupBy);
       byPeriod.set(periodKey, (byPeriod.get(periodKey) ?? 0) + (row.operating_profit_krw ?? 0));
     }
 
@@ -76,7 +77,7 @@ export default function OperatingProfit() {
         period: currentPeriod,
         operating_profit: operatingProfit,
       }));
-  }, [rows, timeGrain]);
+  }, [rows, groupBy]);
 
   if (isLoading) {
     return <div className="p-8 text-center text-gray-400">불러오는 중...</div>;

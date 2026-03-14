@@ -28,9 +28,10 @@ function rowBgClass(row: StockoutRiskRow): string {
 }
 
 export default function StockoutRisk() {
-  const { period, warehouseId, itemId } = useFilterStore();
+  const { fromDate, toDate, warehouseId, itemId } = useFilterStore();
   const { data: resp, isLoading, error } = useStockoutRisk({
-    period,
+    from_date: fromDate,
+    to_date: toDate,
     warehouse_id: warehouseId,
     item_id: itemId,
   });

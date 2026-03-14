@@ -13,11 +13,11 @@ import ErrorState from "../common/ErrorState";
 import KpiCard from "../common/KpiCard";
 
 export default function ForecastOverview() {
-  const { period, warehouseId, itemId } = useFilterStore();
-  const forecast = useForecastAccuracy({ period, warehouse_id: warehouseId, item_id: itemId });
-  const demandPlan = useDemandPlan({ period, warehouse_id: warehouseId, item_id: itemId });
-  const replenishment = useReplenishmentPlan({ period, warehouse_id: warehouseId, item_id: itemId });
-  const leadTime = useLeadTimePrediction({ period, item_id: itemId });
+  const { fromDate, toDate, warehouseId, itemId } = useFilterStore();
+  const forecast = useForecastAccuracy({ from_date: fromDate, to_date: toDate, warehouse_id: warehouseId, item_id: itemId });
+  const demandPlan = useDemandPlan({ from_date: fromDate, to_date: toDate, warehouse_id: warehouseId, item_id: itemId });
+  const replenishment = useReplenishmentPlan({ from_date: fromDate, to_date: toDate, warehouse_id: warehouseId, item_id: itemId });
+  const leadTime = useLeadTimePrediction({ from_date: fromDate, to_date: toDate, item_id: itemId });
 
   const forecastRows: ForecastAccuracyRow[] = forecast.data?.data ?? [];
   const demandRows: DemandPlanRow[] = demandPlan.data?.data ?? [];

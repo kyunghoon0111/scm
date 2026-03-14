@@ -62,9 +62,10 @@ function buildSummary(rows: InventoryOnhandRow[]): SummaryRow[] {
 }
 
 export default function InventoryOnhand() {
-  const { period, warehouseId, itemId } = useFilterStore();
+  const { fromDate, toDate, warehouseId, itemId } = useFilterStore();
   const { data: resp, isLoading, error } = useInventoryOnhand({
-    period,
+    from_date: fromDate,
+    to_date: toDate,
     warehouse_id: warehouseId,
     item_id: itemId,
   });

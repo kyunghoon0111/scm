@@ -26,9 +26,10 @@ function fmtKrw(value: number | null | undefined): string {
 }
 
 export default function Revenue() {
-  const { period, timeGrain, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, groupBy, itemId, channelStoreId } = useFilterStore();
   const { data: resp, isLoading, error } = useRevenue({
-    period,
+    from_date: fromDate,
+    to_date: toDate,
     item_id: itemId,
     channel_store_id: channelStoreId,
   });
@@ -66,7 +67,7 @@ export default function Revenue() {
       const channelId = row.channel_store_id ?? "UNKNOWN";
       channels.add(channelId);
 
-      const periodKey = bucketPeriod(row.period, timeGrain);
+      const periodKey = bucketPeriod(row.period, groupBy);
       const channelMap = byPeriodChannel.get(periodKey) ?? new Map<string, number>();
       channelMap.set(
         channelId,
@@ -89,7 +90,7 @@ export default function Revenue() {
         return entry;
       }),
     };
-  }, [rows, timeGrain]);
+  }, [rows, groupBy]);
 
   const byCountry = useMemo(() => {
     const grouped = new Map<string, { total: number; partial: boolean }>();

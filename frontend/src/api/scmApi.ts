@@ -32,14 +32,26 @@ import type {
 
 interface ScmParams {
   period?: string;
+  from_date?: string;
+  to_date?: string;
   warehouse_id?: string | null;
   item_id?: string | null;
   supplier_id?: string | null;
   channel?: string | null;
 }
 
-function getPeriodRange(period: string) {
-  const [yearText, monthText] = period.split("-");
+function normalizeDateRange(params: Pick<ScmParams, "period" | "from_date" | "to_date">) {
+  if (params.from_date && params.to_date) {
+    return {
+      start: params.from_date,
+      endExclusive: addDays(params.to_date, 1),
+      periods: listPeriodsInRange(params.from_date, params.to_date),
+    };
+  }
+
+  if (!params.period) return null;
+
+  const [yearText, monthText] = params.period.split("-");
   const year = Number(yearText);
   const monthIndex = Number(monthText) - 1;
 
@@ -51,8 +63,31 @@ function getPeriodRange(period: string) {
   const end = new Date(Date.UTC(year, monthIndex + 1, 1));
   return {
     start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
+    endExclusive: end.toISOString().slice(0, 10),
+    periods: [params.period],
   };
+}
+
+function addDays(dateText: string, days: number): string {
+  const date = new Date(`${dateText}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function listPeriodsInRange(fromDate: string, toDate: string): string[] {
+  const start = new Date(`${fromDate}T00:00:00Z`);
+  const end = new Date(`${toDate}T00:00:00Z`);
+  const periods: string[] = [];
+  const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+
+  while (cursor <= end) {
+    const year = cursor.getUTCFullYear();
+    const month = String(cursor.getUTCMonth() + 1).padStart(2, "0");
+    periods.push(`${year}-${month}`);
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+
+  return periods;
 }
 
 function wrap<T>(data: T[] | null, error: unknown): ApiResponse<T[]> {
@@ -97,21 +132,29 @@ const TABLES_WITH_PERIOD = new Set([
   "mart_lead_time_analysis",
 ]);
 
+const DATE_COLUMN_BY_TABLE: Partial<Record<string, string>> = {
+  mart_inventory_onhand: "snapshot_date",
+  mart_stockout_risk: "as_of_date",
+  mart_shipment_daily: "ship_date",
+  mart_demand_plan: "plan_date",
+  mart_replenishment_plan: "plan_date",
+};
+
 function applyFilters(
   query: ReturnType<typeof fromMart>,
   params: ScmParams,
   tableName?: string,
 ) {
   let q = query.select("*");
-  if (params.period && tableName && TABLES_WITH_PERIOD.has(tableName))
-    q = q.eq("period", params.period);
-  if (params.period && tableName === "mart_inventory_onhand") {
-    const range = getPeriodRange(params.period);
-    if (range) q = q.gte("snapshot_date", range.start).lt("snapshot_date", range.end);
+  const range = normalizeDateRange(params);
+
+  if (range && tableName && TABLES_WITH_PERIOD.has(tableName)) {
+    q = range.periods.length === 1 ? q.eq("period", range.periods[0]) : q.in("period", range.periods);
   }
-  if (params.period && tableName === "mart_stockout_risk") {
-    const range = getPeriodRange(params.period);
-    if (range) q = q.gte("as_of_date", range.start).lt("as_of_date", range.end);
+
+  const dateColumn = tableName ? DATE_COLUMN_BY_TABLE[tableName] : null;
+  if (range && dateColumn) {
+    q = q.gte(dateColumn, range.start).lt(dateColumn, range.endExclusive);
   }
   if (params.warehouse_id) q = q.eq("warehouse_id", params.warehouse_id);
   if (params.item_id) q = q.eq("item_id", params.item_id);
@@ -482,11 +525,8 @@ async function fetchDemandPlan(params: ScmParams) {
   let query = fromMart("mart_demand_plan").select("*");
   if (params.item_id) query = query.eq("item_id", params.item_id);
   if (params.warehouse_id) query = query.eq("warehouse_id", params.warehouse_id);
-
-  if (params.period) {
-    const range = getPeriodRange(params.period);
-    if (range) query = query.gte("plan_date", range.start).lt("plan_date", range.end);
-  }
+  const range = normalizeDateRange(params);
+  if (range) query = query.gte("plan_date", range.start).lt("plan_date", range.endExclusive);
 
   const { data, error } = await query.order("plan_date", { ascending: true });
   return wrap<DemandPlanRow>(data, error);
@@ -496,11 +536,8 @@ async function fetchReplenishmentPlan(params: ScmParams) {
   let query = fromMart("mart_replenishment_plan").select("*");
   if (params.item_id) query = query.eq("item_id", params.item_id);
   if (params.warehouse_id) query = query.eq("warehouse_id", params.warehouse_id);
-
-  if (params.period) {
-    const range = getPeriodRange(params.period);
-    if (range) query = query.gte("plan_date", range.start).lt("plan_date", range.end);
-  }
+  const range = normalizeDateRange(params);
+  if (range) query = query.gte("plan_date", range.start).lt("plan_date", range.endExclusive);
 
   const { data, error } = await query.order("plan_date", { ascending: true });
   return wrap<ReplenishmentPlanRow>(data, error);

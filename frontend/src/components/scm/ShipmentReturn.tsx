@@ -15,13 +15,15 @@ function fmtQty(value: number | null | undefined): string {
 }
 
 export default function ShipmentReturn() {
-  const { period, timeGrain, warehouseId, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, groupBy, warehouseId, itemId, channelStoreId } = useFilterStore();
   const shipmentQuery = useShipmentDaily({
-    period,
+    from_date: fromDate,
+    to_date: toDate,
     warehouse_id: warehouseId,
   });
   const returnQuery = useReturnAnalysis({
-    period,
+    from_date: fromDate,
+    to_date: toDate,
     warehouse_id: warehouseId,
     item_id: itemId,
     channel: channelStoreId,
@@ -46,13 +48,13 @@ export default function ShipmentReturn() {
     () =>
       Object.values(
         shipments.reduce<Record<string, { date: string; shippedQty: number }>>((acc, row) => {
-          const bucket = bucketDate(row.ship_date, timeGrain);
+          const bucket = bucketDate(row.ship_date, groupBy);
           if (!acc[bucket]) acc[bucket] = { date: bucket, shippedQty: 0 };
           acc[bucket].shippedQty += row.qty_shipped;
           return acc;
         }, {}),
       ).sort((left, right) => (left.date < right.date ? -1 : 1)),
-    [shipments, timeGrain],
+    [shipments, groupBy],
   );
 
   const returnReasonRows = useMemo(
@@ -111,7 +113,7 @@ export default function ShipmentReturn() {
       {chartData.length > 0 && (
         <div className="panel-card-strong">
           <div className="mb-4">
-            <h3 className="text-sm font-semibold text-gray-800">{timeGrainLabel(timeGrain)} 기준 출고 흐름</h3>
+            <h3 className="text-sm font-semibold text-gray-800">{timeGrainLabel(groupBy)} 기준 출고 흐름</h3>
             <p className="mt-1 text-xs text-gray-500">선택한 집계축 기준으로 출고량 추이를 다시 묶어서 보여줍니다.</p>
           </div>
           <ResponsiveContainer width="100%" height={320}>
