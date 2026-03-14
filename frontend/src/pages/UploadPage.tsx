@@ -92,6 +92,7 @@ export default function UploadPage() {
   const [isStartingJob, setIsStartingJob] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(storedState?.uploadResult ?? null);
   const [uploadError, setUploadError] = useState<string | null>(storedState?.uploadError ?? null);
+  const [forceUpload, setForceUpload] = useState(false);
 
   const { data: mappings = [] } = useColumnMappings();
   const queryClient = useQueryClient();
@@ -110,6 +111,7 @@ export default function UploadPage() {
                 file_name: item.fileName,
                 rows: item.rows,
               })),
+              forceUpload,
             )
           : { items: [] };
 
@@ -325,6 +327,15 @@ export default function UploadPage() {
               {uploadError}
             </div>
           )}
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={forceUpload}
+              onChange={(e) => setForceUpload(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            중복 검사 건너뛰기 (동일 데이터 재적재)
+          </label>
           <button
             onClick={handleUpload}
             disabled={fileResults.length === 0 || uploadMutation.isPending}

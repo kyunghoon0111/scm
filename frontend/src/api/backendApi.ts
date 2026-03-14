@@ -70,11 +70,11 @@ export async function fetchRecentJobs(limit = 20) {
   return response.json() as Promise<{ items: BackendJobSummary[] }>;
 }
 
-export async function uploadRawBatches(items: RawUploadBatchItem[]) {
+export async function uploadRawBatches(items: RawUploadBatchItem[], force = false) {
   const response = await fetch(`${API_URL}/api/uploads/raw`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ items, force }),
   });
 
   if (!response.ok) {

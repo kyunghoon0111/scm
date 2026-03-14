@@ -584,7 +584,7 @@ def log_upload_file(
             conn.commit()
 
 
-def insert_upload_rows(table_name: str, file_name: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
+def insert_upload_rows(table_name: str, file_name: str, rows: list[dict[str, Any]], *, force: bool = False) -> dict[str, Any]:
     allowed_columns = UPLOAD_TABLE_COLUMNS.get(table_name)
     if allowed_columns is None:
         raise ValueError(f"Unsupported upload table: {table_name}")
@@ -615,7 +615,7 @@ def insert_upload_rows(table_name: str, file_name: str, rows: list[dict[str, Any
         int(datetime.now(timezone.utc).timestamp()),
     )
     file_hash = build_upload_hash(table_name, sanitized_rows, ordered_columns)
-    existing = find_existing_upload(file_hash, table_name)
+    existing = find_existing_upload(file_hash, table_name) if not force else None
     if existing is not None:
         log_upload_file(
             batch_id=batch_id,
@@ -764,6 +764,7 @@ class UploadBatchItem(BaseModel):
 
 class UploadBatchRequest(BaseModel):
     items: list[UploadBatchItem]
+    force: bool = False
 
 
 class RollbackBatchRequest(BaseModel):
@@ -820,7 +821,7 @@ def upload_raw_batches(payload: UploadBatchRequest):
                     }
                 )
                 continue
-            upload_result = insert_upload_rows(item.table_name, item.file_name, item.rows)
+            upload_result = insert_upload_rows(item.table_name, item.file_name, item.rows, force=payload.force)
             results.append(
                 {
                     "table_name": item.table_name,
