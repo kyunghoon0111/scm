@@ -783,9 +783,66 @@ app.add_middleware(
 )
 
 
+MIGRATION_FILES = [
+    "migrations/01_create_schemas.sql",
+    "migrations/02_core_dimensions.sql",
+    "migrations/03_core_facts.sql",
+    "migrations/04_mart_tables.sql",
+    "migrations/05_ops_tables.sql",
+    "migrations/06_indexes.sql",
+    "migrations/07_rls_policies.sql",
+    "migrations/08_ml_schema.sql",
+    "migrations/09_settings_tables.sql",
+    "migrations/10_views.sql",
+    "migrations/11_upload_contracts.sql",
+    "migrations/12_backend_job_log.sql",
+    "migrations/13_phase2_upload_contracts.sql",
+    "migrations/14_public_mart_access.sql",
+    "migrations/15_public_settings_read.sql",
+    "migrations/16_upload_dedup_index.sql",
+    "migrations/17_public_ml_mart_access.sql",
+]
+
+
+def apply_migrations_on_startup() -> None:
+    """Apply all SQL migrations idempotently on server startup."""
+    try:
+        dsn = get_database_url()
+    except RuntimeError:
+        print("[startup] DATABASE_URL not set, skipping migrations")
+        return
+
+    with psycopg2.connect(dsn) as conn:
+        conn.autocommit = False
+        with conn.cursor() as cur:
+            for rel_path in MIGRATION_FILES:
+                path = REPO_ROOT / rel_path
+                if not path.exists():
+                    print(f"[startup] skip missing: {rel_path}")
+                    continue
+                try:
+                    cur.execute(path.read_text(encoding="utf-8"))
+                    conn.commit()
+                    print(f"[startup] applied: {rel_path}")
+                except Exception as exc:
+                    conn.rollback()
+                    print(f"[startup] FAILED: {rel_path} - {exc}")
+
+
+apply_migrations_on_startup()
+
+
 @app.get("/health")
 def health():
-    return {"ok": True, "service": "scm-ops-backend"}
+    try:
+        dsn = get_database_url()
+        with psycopg2.connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        db_ok = True
+    except Exception:
+        db_ok = False
+    return {"ok": db_ok, "service": "scm-ops-backend", "db_connected": db_ok}
 
 
 @app.post("/api/jobs/finalize")
