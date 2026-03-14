@@ -13,6 +13,19 @@ export interface BackendJobDetail extends BackendJobSummary {
   detail?: Record<string, unknown> | null;
 }
 
+export interface RawUploadBatchItem {
+  table_name: string;
+  file_name: string;
+  rows: Record<string, unknown>[];
+}
+
+export interface RawUploadBatchResult {
+  table_name: string;
+  file_name: string;
+  inserted_count: number;
+  error: string | null;
+}
+
 const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
 
 export async function startFinalizeJob() {
@@ -24,7 +37,7 @@ export async function startFinalizeJob() {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || "후처리 작업을 시작하지 못했습니다.");
+    throw new Error(text || "Failed to start finalize job.");
   }
 
   return response.json() as Promise<{ job_id: string; status: string }>;
@@ -34,7 +47,22 @@ export async function fetchJob(jobId: string) {
   const response = await fetch(`${API_URL}/api/jobs/${jobId}`);
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || "작업 상태를 불러오지 못했습니다.");
+    throw new Error(text || "Failed to fetch job status.");
   }
   return response.json() as Promise<BackendJobDetail>;
+}
+
+export async function uploadRawBatches(items: RawUploadBatchItem[]) {
+  const response = await fetch(`${API_URL}/api/uploads/raw`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Failed to upload raw rows.");
+  }
+
+  return response.json() as Promise<{ items: RawUploadBatchResult[] }>;
 }

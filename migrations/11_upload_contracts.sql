@@ -171,6 +171,32 @@ CREATE TABLE IF NOT EXISTS raw.upload_charge (
 COMMENT ON TABLE raw.upload_charge IS '업로드 계약: 비용 원본';
 
 -- RLS for upload contract tables
+DO $$
+DECLARE
+  target record;
+BEGIN
+  FOR target IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE (schemaname, tablename) IN (
+      ('raw', 'upload_inventory_snapshot'),
+      ('raw', 'upload_purchase_order'),
+      ('raw', 'upload_receipt'),
+      ('raw', 'upload_shipment'),
+      ('raw', 'upload_return'),
+      ('raw', 'upload_sales'),
+      ('raw', 'upload_charge')
+    )
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I.%I',
+      target.policyname,
+      target.schemaname,
+      target.tablename
+    );
+  END LOOP;
+END $$;
+
 ALTER TABLE raw.upload_inventory_snapshot ENABLE ROW LEVEL SECURITY;
 ALTER TABLE raw.upload_purchase_order     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE raw.upload_receipt            ENABLE ROW LEVEL SECURITY;

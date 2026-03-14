@@ -45,6 +45,14 @@ export interface UploadResult {
   hasErrors: boolean;
 }
 
+export interface PreparedUploadPayload {
+  tableName: string;
+  fileName: string;
+  rows: Record<string, unknown>[];
+  skippedCount: number;
+  errors: string[];
+}
+
 export const UPLOAD_DATASETS: UploadDatasetSchema[] = [
   {
     raw_table_name: "upload_inventory_snapshot",
@@ -595,4 +603,50 @@ export function useDirectUpload() {
       queryClient.invalidateQueries({ queryKey: ["pnl"] });
     },
   });
+}
+
+export async function prepareUploadPayload(fileResult: FileParseResult): Promise<PreparedUploadPayload> {
+  if (!fileResult.detectedTable) {
+    return {
+      tableName: "unknown",
+      fileName: fileResult.file.name,
+      rows: [],
+      skippedCount: 0,
+      errors: ["?곗씠?곗뀑 ?좏삎???먮룞?쇰줈 ?먮퀎?섏? 紐삵뻽?듬땲??"],
+    };
+  }
+
+  const dataset = getDataset(fileResult.detectedTable);
+  if (!dataset) {
+    throw new Error(`Unsupported upload table: ${fileResult.detectedTable}`);
+  }
+
+  const batchId = Date.now();
+  const allRows = await parseFullFile(fileResult.file);
+  const rows: Record<string, unknown>[] = [];
+  const errors: string[] = [];
+
+  allRows.forEach((rawRow, index) => {
+    const { row, missing } = createUploadRow(
+      rawRow,
+      fileResult.mappedColumns,
+      index + 2,
+      fileResult.file.name,
+      batchId,
+      dataset,
+    );
+    if (missing.length > 0) {
+      errors.push(`${index + 2}?? ?꾩닔 而щ읆 ?꾨씫 (${missing.join(", ")})`);
+      return;
+    }
+    rows.push(row);
+  });
+
+  return {
+    tableName: dataset.raw_table_name,
+    fileName: fileResult.file.name,
+    rows,
+    skippedCount: allRows.length - rows.length,
+    errors: errors.slice(0, 20),
+  };
 }

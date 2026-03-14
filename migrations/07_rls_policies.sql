@@ -13,6 +13,62 @@
 --       프론트엔드 ANON KEY는 RLS 적용
 -- =============================================================
 
+DO $$
+DECLARE
+  target record;
+BEGIN
+  FOR target IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE (schemaname, tablename) IN (
+      ('mart', 'mart_inventory_onhand'),
+      ('mart', 'mart_stockout_risk'),
+      ('mart', 'mart_overstock'),
+      ('mart', 'mart_expiry_risk'),
+      ('mart', 'mart_fefo_pick_list'),
+      ('mart', 'mart_open_po'),
+      ('mart', 'mart_service_level'),
+      ('mart', 'mart_shipment_performance'),
+      ('mart', 'mart_shipment_daily'),
+      ('mart', 'mart_return_analysis'),
+      ('mart', 'mart_return_daily'),
+      ('mart', 'mart_pnl_revenue'),
+      ('mart', 'mart_pnl_cogs'),
+      ('mart', 'mart_pnl_gross_margin'),
+      ('mart', 'mart_pnl_variable_cost'),
+      ('mart', 'mart_pnl_contribution'),
+      ('mart', 'mart_pnl_operating_profit'),
+      ('mart', 'mart_pnl_waterfall_summary'),
+      ('mart', 'mart_charge_allocated'),
+      ('mart', 'mart_reco_inventory_movement'),
+      ('mart', 'mart_reco_oms_vs_wms'),
+      ('mart', 'mart_reco_erp_gr_vs_wms_receipt'),
+      ('mart', 'mart_reco_settlement_vs_estimated'),
+      ('mart', 'mart_reco_charges_invoice_vs_allocated'),
+      ('mart', 'mart_constraint_signals'),
+      ('mart', 'mart_constraint_root_cause'),
+      ('mart', 'mart_constraint_action_plan'),
+      ('mart', 'mart_constraint_effectiveness'),
+      ('mart', 'mart_coverage_period'),
+      ('ops', 'ops_issue_log'),
+      ('ops', 'ops_period_close'),
+      ('ops', 'ops_adjustment_log'),
+      ('ops', 'ops_snapshot'),
+      ('raw', 'system_batch_log'),
+      ('raw', 'system_file_log'),
+      ('raw', 'system_dq_report'),
+      ('raw', 'system_batch_lock')
+    )
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I.%I',
+      target.policyname,
+      target.schemaname,
+      target.tablename
+    );
+  END LOOP;
+END $$;
+
 
 -- ================================================================
 -- SCM MART 테이블 — RLS 활성화

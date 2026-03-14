@@ -229,6 +229,30 @@ CREATE INDEX IF NOT EXISTS idx_model_performance_period
 -- ================================================================
 
 -- MART 테이블: scm + pnl + readonly 읽기 가능
+DO $$
+DECLARE
+  target record;
+BEGIN
+  FOR target IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE (schemaname, tablename) IN (
+      ('mart', 'mart_forecast_accuracy'),
+      ('mart', 'mart_demand_plan'),
+      ('mart', 'mart_replenishment_plan'),
+      ('mart', 'mart_lead_time_analysis'),
+      ('mart', 'mart_model_performance')
+    )
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I.%I',
+      target.policyname,
+      target.schemaname,
+      target.tablename
+    );
+  END LOOP;
+END $$;
+
 ALTER TABLE mart.mart_forecast_accuracy   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mart.mart_demand_plan         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mart.mart_replenishment_plan  ENABLE ROW LEVEL SECURITY;

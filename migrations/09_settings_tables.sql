@@ -105,6 +105,29 @@ INSERT INTO ops.coverage_policy_config (domain, requirement, close_period_enforc
 ON CONFLICT DO NOTHING;
 
 -- RLS 정책 — 설정 테이블은 admin만 수정, 나머지는 읽기 가능
+DO $$
+DECLARE
+  target record;
+BEGIN
+  FOR target IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE (schemaname, tablename) IN (
+      ('ops', 'column_mappings'),
+      ('ops', 'charge_type_config'),
+      ('ops', 'threshold_config'),
+      ('ops', 'coverage_policy_config')
+    )
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I.%I',
+      target.policyname,
+      target.schemaname,
+      target.tablename
+    );
+  END LOOP;
+END $$;
+
 ALTER TABLE ops.column_mappings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ops.charge_type_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ops.threshold_config ENABLE ROW LEVEL SECURITY;

@@ -1,15 +1,18 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { fetchJob, startFinalizeJob, type BackendJobDetail } from "../api/backendApi";
+import { fetchJob, startFinalizeJob, uploadRawBatches, type BackendJobDetail } from "../api/backendApi";
 import {
   buildAliasMapFromMappings,
   downloadTemplate,
   getColumnLabel,
   parsePreviewFile,
+  prepareUploadPayload,
   TABLE_LABELS,
   UPLOAD_DATASETS,
   useColumnMappings,
-  useDirectUpload,
+  type DirectInsertResult,
   type FileParseResult,
+  type UploadResult,
 } from "../api/uploadApi";
 
 function scoreLabel(score: number) {
@@ -41,7 +44,63 @@ export default function UploadPage() {
   const [isStartingJob, setIsStartingJob] = useState(false);
 
   const { data: mappings = [] } = useColumnMappings();
-  const uploadMutation = useDirectUpload();
+  const queryClient = useQueryClient();
+  const uploadMutation = useMutation({
+    mutationFn: async ({ fileResults }: { fileResults: FileParseResult[] }): Promise<UploadResult> => {
+      const prepared = await Promise.all(fileResults.map((fileResult) => prepareUploadPayload(fileResult)));
+      const uploadable = prepared.filter((item) => item.tableName !== "unknown" && item.rows.length > 0);
+
+      const backendResponse = uploadable.length > 0
+        ? await uploadRawBatches(
+            uploadable.map((item) => ({
+              table_name: item.tableName,
+              file_name: item.fileName,
+              rows: item.rows,
+            })),
+          )
+        : { items: [] };
+
+      const backendMap = new Map(backendResponse.items.map((item) => [`${item.file_name}|${item.table_name}`, item]));
+      const results: DirectInsertResult[] = prepared.map((item) => {
+        if (item.tableName === "unknown") {
+          return {
+            tableName: item.tableName,
+            fileName: item.fileName,
+            insertedCount: 0,
+            skippedCount: item.skippedCount,
+            errors: item.errors,
+          };
+        }
+
+        const backendItem = backendMap.get(`${item.fileName}|${item.tableName}`);
+        const insertedCount = backendItem?.inserted_count ?? 0;
+        const errors = [...item.errors];
+        if (backendItem?.error) {
+          errors.push(backendItem.error);
+        }
+
+        return {
+          tableName: item.tableName,
+          fileName: item.fileName,
+          insertedCount,
+          skippedCount: item.skippedCount,
+          errors: errors.slice(0, 20),
+        };
+      });
+
+      return {
+        totalInserted: results.reduce((sum, result) => sum + result.insertedCount, 0),
+        totalSkipped: results.reduce((sum, result) => sum + result.skippedCount, 0),
+        hasErrors: results.some((result) => result.errors.length > 0),
+        results,
+      };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["upload"] });
+      queryClient.invalidateQueries({ queryKey: ["scm"] });
+      queryClient.invalidateQueries({ queryKey: ["pnl"] });
+    },
+  });
 
   const aliasMap = useMemo(() => buildAliasMapFromMappings(mappings), [mappings]);
 

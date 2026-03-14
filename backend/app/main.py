@@ -10,12 +10,132 @@ from pathlib import Path
 from typing import Any
 
 import psycopg2
+from psycopg2 import extras, sql
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+UPLOAD_TABLE_COLUMNS: dict[str, set[str]] = {
+    "upload_inventory_snapshot": {
+        "batch_id",
+        "source_file_name",
+        "source_row_no",
+        "snapshot_date",
+        "warehouse_id",
+        "item_id",
+        "lot_id",
+        "onhand_qty",
+        "sellable_qty",
+        "blocked_qty",
+        "expiry_date",
+        "mfg_date",
+        "qc_status",
+        "hold_flag",
+        "source_system",
+    },
+    "upload_purchase_order": {
+        "batch_id",
+        "source_file_name",
+        "source_row_no",
+        "po_id",
+        "po_date",
+        "supplier_id",
+        "item_id",
+        "qty_ordered",
+        "eta_date",
+        "unit_price",
+        "currency",
+        "incoterms",
+        "source_system",
+    },
+    "upload_receipt": {
+        "batch_id",
+        "source_file_name",
+        "source_row_no",
+        "receipt_id",
+        "receipt_date",
+        "warehouse_id",
+        "item_id",
+        "qty_received",
+        "po_id",
+        "lot_id",
+        "expiry_date",
+        "mfg_date",
+        "qc_status",
+        "source_system",
+    },
+    "upload_shipment": {
+        "batch_id",
+        "source_file_name",
+        "source_row_no",
+        "shipment_id",
+        "ship_date",
+        "warehouse_id",
+        "item_id",
+        "qty_shipped",
+        "lot_id",
+        "weight",
+        "volume_cbm",
+        "channel_order_id",
+        "channel_store_id",
+        "source_system",
+    },
+    "upload_return": {
+        "batch_id",
+        "source_file_name",
+        "source_row_no",
+        "return_id",
+        "return_date",
+        "warehouse_id",
+        "item_id",
+        "qty_returned",
+        "lot_id",
+        "channel_order_id",
+        "reason",
+        "disposition",
+        "source_system",
+    },
+    "upload_sales": {
+        "batch_id",
+        "source_file_name",
+        "source_row_no",
+        "settlement_id",
+        "line_no",
+        "period",
+        "channel_store_id",
+        "item_id",
+        "currency",
+        "gross_sales",
+        "discounts",
+        "fees",
+        "refunds",
+        "net_payout",
+        "source_system",
+    },
+    "upload_charge": {
+        "batch_id",
+        "source_file_name",
+        "source_row_no",
+        "invoice_no",
+        "invoice_line_no",
+        "charge_type",
+        "amount",
+        "currency",
+        "period",
+        "invoice_date",
+        "vendor_partner_id",
+        "charge_basis",
+        "reference_type",
+        "reference_id",
+        "channel_store_id",
+        "warehouse_id",
+        "country",
+        "source_system",
+    },
+}
 
 
 def utc_now() -> datetime:
@@ -179,6 +299,42 @@ def run_command(command: list[str]) -> dict[str, Any]:
     }
 
 
+def insert_upload_rows(table_name: str, rows: list[dict[str, Any]]) -> int:
+    allowed_columns = UPLOAD_TABLE_COLUMNS.get(table_name)
+    if allowed_columns is None:
+        raise ValueError(f"Unsupported upload table: {table_name}")
+    if not rows:
+        return 0
+
+    sanitized_rows: list[dict[str, Any]] = []
+    ordered_columns: list[str] = []
+
+    for row in rows:
+        sanitized = {key: value for key, value in row.items() if key in allowed_columns}
+        if not sanitized:
+            continue
+        sanitized_rows.append(sanitized)
+        for key in sanitized:
+            if key not in ordered_columns:
+                ordered_columns.append(key)
+
+    if not sanitized_rows or not ordered_columns:
+        return 0
+
+    values = [[row.get(column) for column in ordered_columns] for row in sanitized_rows]
+
+    query = sql.SQL("INSERT INTO raw.{table} ({columns}) VALUES %s").format(
+        table=sql.Identifier(table_name),
+        columns=sql.SQL(", ").join(sql.Identifier(column) for column in ordered_columns),
+    )
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            extras.execute_values(cur, query, values, page_size=500)
+            conn.commit()
+    return len(sanitized_rows)
+
+
 def execute_finalize_job(job_id: str) -> None:
     write_job(job_id, status="running")
     steps: list[dict[str, Any]] = []
@@ -206,6 +362,16 @@ def execute_finalize_job(job_id: str) -> None:
 
 class FinalizeJobRequest(BaseModel):
     trigger_source: str = "frontend"
+
+
+class UploadBatchItem(BaseModel):
+    table_name: str
+    file_name: str
+    rows: list[dict[str, Any]]
+
+
+class UploadBatchRequest(BaseModel):
+    items: list[UploadBatchItem]
 
 
 app = FastAPI(title="SCM Ops Backend", version="0.1.0")
@@ -237,6 +403,34 @@ def create_finalize_job(payload: FinalizeJobRequest, background_tasks: Backgroun
     )
     background_tasks.add_task(execute_finalize_job, job_id)
     return {"job_id": job_id, "status": "queued"}
+
+
+@app.post("/api/uploads/raw")
+def upload_raw_batches(payload: UploadBatchRequest):
+    results: list[dict[str, Any]] = []
+
+    for item in payload.items:
+        try:
+            inserted = insert_upload_rows(item.table_name, item.rows)
+            results.append(
+                {
+                    "table_name": item.table_name,
+                    "file_name": item.file_name,
+                    "inserted_count": inserted,
+                    "error": None,
+                }
+            )
+        except Exception as exc:
+            results.append(
+                {
+                    "table_name": item.table_name,
+                    "file_name": item.file_name,
+                    "inserted_count": 0,
+                    "error": str(exc),
+                }
+            )
+
+    return {"items": results}
 
 
 @app.get("/api/jobs/{job_id}")

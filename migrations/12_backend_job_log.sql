@@ -19,6 +19,24 @@ COMMENT ON TABLE ops.backend_job_log IS 'Railway FastAPI 후처리 작업 이력
 
 ALTER TABLE ops.backend_job_log ENABLE ROW LEVEL SECURITY;
 
+DO $$
+DECLARE
+  target record;
+BEGIN
+  FOR target IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE (schemaname, tablename) = ('ops', 'backend_job_log')
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I.%I',
+      target.policyname,
+      target.schemaname,
+      target.tablename
+    );
+  END LOOP;
+END $$;
+
 CREATE POLICY "backend_job_admin_full_access" ON ops.backend_job_log
   FOR ALL USING ((auth.jwt() ->> 'role') = 'admin')
   WITH CHECK ((auth.jwt() ->> 'role') = 'admin');
