@@ -34,6 +34,16 @@ UPLOAD_TABLE_COLUMNS: dict[str, set[str]] = {
         "mfg_date",
         "qc_status",
         "hold_flag",
+        "owner_id",
+        "inventory_status",
+        "channel_store_id",
+        "reserved_qty",
+        "damaged_qty",
+        "in_transit_qty",
+        "safety_stock_qty",
+        "unit_cost",
+        "country",
+        "source_updated_at",
         "source_system",
     },
     "upload_purchase_order": {
@@ -45,10 +55,20 @@ UPLOAD_TABLE_COLUMNS: dict[str, set[str]] = {
         "supplier_id",
         "item_id",
         "qty_ordered",
+        "po_line_id",
+        "warehouse_id",
         "eta_date",
         "unit_price",
         "currency",
         "incoterms",
+        "country",
+        "expected_lead_time_days",
+        "order_status",
+        "buyer_id",
+        "moq_qty",
+        "pack_size",
+        "tax_amount",
+        "source_updated_at",
         "source_system",
     },
     "upload_receipt": {
@@ -60,11 +80,21 @@ UPLOAD_TABLE_COLUMNS: dict[str, set[str]] = {
         "warehouse_id",
         "item_id",
         "qty_received",
+        "receipt_line_id",
         "po_id",
+        "po_line_id",
         "lot_id",
         "expiry_date",
         "mfg_date",
         "qc_status",
+        "putaway_completed_at",
+        "inspection_result",
+        "damaged_qty",
+        "short_received_qty",
+        "excess_received_qty",
+        "carrier_id",
+        "dock_id",
+        "source_updated_at",
         "source_system",
     },
     "upload_shipment": {
@@ -76,11 +106,21 @@ UPLOAD_TABLE_COLUMNS: dict[str, set[str]] = {
         "warehouse_id",
         "item_id",
         "qty_shipped",
+        "shipment_line_id",
         "lot_id",
         "weight",
         "volume_cbm",
         "channel_order_id",
         "channel_store_id",
+        "order_id",
+        "order_line_id",
+        "country",
+        "carrier_id",
+        "tracking_no",
+        "shipping_fee",
+        "promised_ship_date",
+        "delivered_at",
+        "source_updated_at",
         "source_system",
     },
     "upload_return": {
@@ -92,10 +132,20 @@ UPLOAD_TABLE_COLUMNS: dict[str, set[str]] = {
         "warehouse_id",
         "item_id",
         "qty_returned",
+        "return_line_id",
         "lot_id",
         "channel_order_id",
+        "channel_store_id",
+        "order_id",
+        "order_line_id",
         "reason",
         "disposition",
+        "refund_amount",
+        "return_shipping_fee",
+        "return_reason_code",
+        "return_quality_grade",
+        "resellable_flag",
+        "source_updated_at",
         "source_system",
     },
     "upload_sales": {
@@ -107,12 +157,26 @@ UPLOAD_TABLE_COLUMNS: dict[str, set[str]] = {
         "period",
         "channel_store_id",
         "item_id",
+        "order_id",
+        "order_line_id",
+        "order_date",
+        "ship_date",
+        "country",
         "currency",
         "gross_sales",
+        "quantity_sold",
+        "unit_selling_price",
         "discounts",
         "fees",
         "refunds",
         "net_payout",
+        "tax_amount",
+        "promo_cost",
+        "platform_fee",
+        "payment_fee",
+        "coupon_amount",
+        "sales_channel_group",
+        "source_updated_at",
         "source_system",
     },
     "upload_charge": {
@@ -127,12 +191,23 @@ UPLOAD_TABLE_COLUMNS: dict[str, set[str]] = {
         "period",
         "invoice_date",
         "vendor_partner_id",
+        "supplier_id",
         "charge_basis",
         "reference_type",
         "reference_id",
+        "charge_category",
+        "cost_center",
         "channel_store_id",
+        "item_id",
         "warehouse_id",
         "country",
+        "allocation_key",
+        "allocation_basis_value",
+        "tax_amount",
+        "invoice_status",
+        "reference_period",
+        "accrual_flag",
+        "source_updated_at",
         "source_system",
     },
 }
@@ -283,20 +358,33 @@ def list_recent_jobs(limit: int = 10) -> list[dict[str, Any]]:
             ]
 
 
-def run_command(command: list[str]) -> dict[str, Any]:
-    completed = subprocess.run(
-        command,
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return {
-        "command": " ".join(command),
-        "returncode": completed.returncode,
-        "stdout": completed.stdout[-4000:],
-        "stderr": completed.stderr[-4000:],
-    }
+def run_command(command: list[str], *, timeout_seconds: int) -> dict[str, Any]:
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+        return {
+            "command": " ".join(command),
+            "returncode": completed.returncode,
+            "stdout": completed.stdout[-4000:],
+            "stderr": completed.stderr[-4000:],
+            "timed_out": False,
+        }
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout or ""
+        stderr = exc.stderr or ""
+        return {
+            "command": " ".join(command),
+            "returncode": -1,
+            "stdout": stdout[-4000:],
+            "stderr": stderr[-4000:] or f"Command timed out after {timeout_seconds} seconds.",
+            "timed_out": True,
+        }
 
 
 def insert_upload_rows(table_name: str, rows: list[dict[str, Any]]) -> int:
@@ -339,22 +427,37 @@ def execute_finalize_job(job_id: str) -> None:
     write_job(job_id, status="running")
     steps: list[dict[str, Any]] = []
     try:
-        promote_result = run_command([sys.executable, "scripts/promote_raw_uploads.py"])
+        write_job(
+            job_id,
+            status="running",
+            detail={"current_step": "promote_raw_uploads", "steps": steps, "started_at": utc_now().isoformat()},
+        )
+        promote_result = run_command([sys.executable, "scripts/promote_raw_uploads.py"], timeout_seconds=300)
         steps.append({"name": "promote_raw_uploads", **promote_result})
         if promote_result["returncode"] != 0:
             raise RuntimeError(promote_result["stderr"] or promote_result["stdout"] or "promote_raw_uploads failed")
 
-        pipeline_result = run_command([sys.executable, "run.py", "--once"])
+        write_job(
+            job_id,
+            status="running",
+            detail={"current_step": "run_pipeline", "steps": steps, "started_at": utc_now().isoformat()},
+        )
+        pipeline_result = run_command([sys.executable, "run.py", "--once"], timeout_seconds=600)
         steps.append({"name": "run_pipeline", **pipeline_result})
         if pipeline_result["returncode"] != 0:
             raise RuntimeError(pipeline_result["stderr"] or pipeline_result["stdout"] or "run.py --once failed")
 
-        write_job(job_id, status="success", detail={"steps": steps, "completed_at": utc_now().isoformat()}, finished=True)
+        write_job(
+            job_id,
+            status="success",
+            detail={"current_step": None, "steps": steps, "completed_at": utc_now().isoformat()},
+            finished=True,
+        )
     except Exception as exc:
         write_job(
             job_id,
             status="failed",
-            detail={"steps": steps, "failed_at": utc_now().isoformat()},
+            detail={"current_step": None, "steps": steps, "failed_at": utc_now().isoformat()},
             error_msg=str(exc),
             finished=True,
         )

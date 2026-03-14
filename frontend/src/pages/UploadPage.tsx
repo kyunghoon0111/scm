@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { fetchJob, startFinalizeJob, uploadRawBatches, type BackendJobDetail } from "../api/backendApi";
 import {
   buildAliasMapFromMappings,
@@ -14,6 +14,45 @@ import {
   type FileParseResult,
   type UploadResult,
 } from "../api/uploadApi";
+
+const UPLOAD_PAGE_STORAGE_KEY = "scm-upload-page-state";
+
+type UploadPreviewState = Omit<FileParseResult, "file"> & {
+  file: File | null;
+  fileName: string;
+  restored?: boolean;
+};
+
+interface StoredUploadPreviewState {
+  fileName: string;
+  headers: string[];
+  previewRows: Record<string, string>[];
+  detectedTable: string | null;
+  detectedScore: number;
+  mappedColumns: Record<string, string>;
+  unmappedColumns: string[];
+}
+
+interface StoredUploadPageState {
+  fileResults: StoredUploadPreviewState[];
+  uploadResult: UploadResult | null;
+  job: BackendJobDetail | null;
+  jobError: string | null;
+  uploadError: string | null;
+}
+
+function loadStoredState(): StoredUploadPageState | null {
+  if (typeof window === "undefined") return null;
+
+  const raw = window.sessionStorage.getItem(UPLOAD_PAGE_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as StoredUploadPageState;
+  } catch {
+    return null;
+  }
+}
 
 function scoreLabel(score: number) {
   if (score >= 0.85) return "높음";
@@ -37,28 +76,41 @@ function jobStatusLabel(status: string | undefined) {
 }
 
 export default function UploadPage() {
-  const [fileResults, setFileResults] = useState<FileParseResult[]>([]);
+  const storedState = loadStoredState();
+
+  const [fileResults, setFileResults] = useState<UploadPreviewState[]>(
+    () =>
+      storedState?.fileResults.map((result) => ({
+        ...result,
+        file: null,
+        restored: true,
+      })) ?? [],
+  );
   const [isParsing, setIsParsing] = useState(false);
-  const [job, setJob] = useState<BackendJobDetail | null>(null);
-  const [jobError, setJobError] = useState<string | null>(null);
+  const [job, setJob] = useState<BackendJobDetail | null>(storedState?.job ?? null);
+  const [jobError, setJobError] = useState<string | null>(storedState?.jobError ?? null);
   const [isStartingJob, setIsStartingJob] = useState(false);
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(storedState?.uploadResult ?? null);
+  const [uploadError, setUploadError] = useState<string | null>(storedState?.uploadError ?? null);
 
   const { data: mappings = [] } = useColumnMappings();
   const queryClient = useQueryClient();
+
   const uploadMutation = useMutation({
     mutationFn: async ({ fileResults }: { fileResults: FileParseResult[] }): Promise<UploadResult> => {
       const prepared = await Promise.all(fileResults.map((fileResult) => prepareUploadPayload(fileResult)));
       const uploadable = prepared.filter((item) => item.tableName !== "unknown" && item.rows.length > 0);
 
-      const backendResponse = uploadable.length > 0
-        ? await uploadRawBatches(
-            uploadable.map((item) => ({
-              table_name: item.tableName,
-              file_name: item.fileName,
-              rows: item.rows,
-            })),
-          )
-        : { items: [] };
+      const backendResponse =
+        uploadable.length > 0
+          ? await uploadRawBatches(
+              uploadable.map((item) => ({
+                table_name: item.tableName,
+                file_name: item.fileName,
+                rows: item.rows,
+              })),
+            )
+          : { items: [] };
 
       const backendMap = new Map(backendResponse.items.map((item) => [`${item.file_name}|${item.table_name}`, item]));
       const results: DirectInsertResult[] = prepared.map((item) => {
@@ -95,14 +147,41 @@ export default function UploadPage() {
         results,
       };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setUploadResult(data);
+      setUploadError(null);
       queryClient.invalidateQueries({ queryKey: ["upload"] });
       queryClient.invalidateQueries({ queryKey: ["scm"] });
       queryClient.invalidateQueries({ queryKey: ["pnl"] });
     },
+    onError: (error) => {
+      setUploadError(error instanceof Error ? error.message : "raw 적재 중 오류가 발생했습니다.");
+    },
   });
 
   const aliasMap = useMemo(() => buildAliasMapFromMappings(mappings), [mappings]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const persisted: StoredUploadPageState = {
+      fileResults: fileResults.map((result) => ({
+        fileName: result.fileName,
+        headers: result.headers,
+        previewRows: result.previewRows,
+        detectedTable: result.detectedTable,
+        detectedScore: result.detectedScore,
+        mappedColumns: result.mappedColumns,
+        unmappedColumns: result.unmappedColumns,
+      })),
+      uploadResult,
+      job,
+      jobError,
+      uploadError,
+    };
+
+    window.sessionStorage.setItem(UPLOAD_PAGE_STORAGE_KEY, JSON.stringify(persisted));
+  }, [fileResults, job, jobError, uploadError, uploadResult]);
 
   useEffect(() => {
     if (!job?.job_id) return;
@@ -125,9 +204,20 @@ export default function UploadPage() {
     if (files.length === 0) return;
 
     setIsParsing(true);
+    setUploadError(null);
+    setJobError(null);
+    setJob(null);
+    setUploadResult(null);
+
     try {
       const parsed = await Promise.all(files.map((file) => parsePreviewFile(file, aliasMap)));
-      setFileResults(parsed);
+      setFileResults(
+        parsed.map((result) => ({
+          ...result,
+          fileName: result.file.name,
+          restored: false,
+        })),
+      );
     } finally {
       setIsParsing(false);
     }
@@ -135,7 +225,14 @@ export default function UploadPage() {
 
   async function handleUpload() {
     if (fileResults.length === 0) return;
-    await uploadMutation.mutateAsync({ fileResults });
+
+    const missingFiles = fileResults.some((result) => result.file === null);
+    if (missingFiles) {
+      setUploadError("탭 이동 후 복원된 파일은 보안상 다시 선택해야 적재할 수 있습니다.");
+      return;
+    }
+
+    await uploadMutation.mutateAsync({ fileResults: fileResults as FileParseResult[] });
   }
 
   async function handleFinalize() {
@@ -161,7 +258,9 @@ export default function UploadPage() {
             템플릿 다운로드부터 raw 적재, 후처리 실행까지 한 흐름으로 진행합니다.
           </h1>
           <p className="mt-3 text-sm leading-6 text-gray-600 md:text-base">
-            먼저 파일을 업로드해 raw 계약 테이블에 저장하고, 그 다음 버튼 한 번으로 Railway 백엔드가 `raw → core → mart` 후처리를 이어서 실행합니다.
+            먼저 파일을 업로드해 raw 계약 테이블에 적재하고, 그 다음 버튼 한 번으로 Railway 백엔드가
+            <code className="mx-1 rounded bg-black/5 px-1 py-0.5">raw -&gt; core -&gt; mart</code>
+            후처리를 이어서 실행합니다.
           </p>
         </div>
       </div>
@@ -170,7 +269,7 @@ export default function UploadPage() {
         <section className="panel-card space-y-4">
           <div>
             <h2 className="text-base font-semibold text-gray-900">1. 템플릿 다운로드</h2>
-            <p className="mt-1 text-sm text-gray-500">데이터셋별 표준 헤더를 내려받아 사내 원본 파일 형식을 맞춥니다.</p>
+            <p className="mt-1 text-sm text-gray-500">업로드 형식에 맞는 템플릿을 내려받아 준비합니다.</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {UPLOAD_DATASETS.map((dataset) => (
@@ -190,7 +289,7 @@ export default function UploadPage() {
         <section className="panel-card space-y-4">
           <div>
             <h2 className="text-base font-semibold text-gray-900">2. 파일 업로드</h2>
-            <p className="mt-1 text-sm text-gray-500">CSV 또는 엑셀 파일을 선택하면 컬럼과 데이터셋 유형을 자동 판별합니다.</p>
+            <p className="mt-1 text-sm text-gray-500">CSV 또는 엑셀 파일을 선택하면 컬럼과 데이터 유형을 자동 판별합니다.</p>
           </div>
           <label className="flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-black/15 bg-stone-50 px-6 py-8 text-center transition hover:border-orange-300 hover:bg-orange-50">
             <span className="text-sm font-semibold text-gray-800">파일 추가</span>
@@ -204,6 +303,11 @@ export default function UploadPage() {
                 ? `${fileResults.length}개 파일을 읽었습니다. 자동 판별 결과를 확인한 뒤 raw 적재를 진행하세요.`
                 : "아직 선택된 파일이 없습니다."}
           </div>
+          {uploadError && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {uploadError}
+            </div>
+          )}
           <button
             onClick={handleUpload}
             disabled={fileResults.length === 0 || uploadMutation.isPending}
@@ -218,17 +322,21 @@ export default function UploadPage() {
         <section className="space-y-4">
           <div>
             <h2 className="text-base font-semibold text-gray-900">파일 검토</h2>
-            <p className="mt-1 text-sm text-gray-500">자동 판별 결과와 미리보기를 기준으로 업로드 전에 구조를 확인합니다.</p>
+            <p className="mt-1 text-sm text-gray-500">자동 판별 결과와 미리보기를 기준으로 업로드 전 구조를 확인합니다.</p>
           </div>
           <div className="grid gap-4">
             {fileResults.map((result) => (
-              <div key={result.file.name} className="panel-card space-y-4">
+              <div key={result.fileName} className="panel-card space-y-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900">{result.file.name}</h3>
+                    <h3 className="text-sm font-semibold text-gray-900">{result.fileName}</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      자동 판별: {result.detectedTable ? TABLE_LABELS[result.detectedTable] : "미판별"} / 신뢰도 {scoreLabel(result.detectedScore)} ({Math.round(result.detectedScore * 100)}%)
+                      자동 판별: {result.detectedTable ? TABLE_LABELS[result.detectedTable] : "미판별"} / 신뢰도 {scoreLabel(result.detectedScore)} (
+                      {Math.round(result.detectedScore * 100)}%)
                     </p>
+                    {result.restored && (
+                      <p className="mt-1 text-xs text-amber-700">이 검토 화면은 복원된 상태입니다. 적재하려면 파일을 다시 선택해 주세요.</p>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs">
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">매핑 {Object.keys(result.mappedColumns).length}개</span>
@@ -259,9 +367,9 @@ export default function UploadPage() {
                     </thead>
                     <tbody>
                       {result.previewRows.map((row, index) => (
-                        <tr key={`${result.file.name}-${index}`} className="border-t border-gray-100 hover:bg-gray-50">
+                        <tr key={`${result.fileName}-${index}`} className="border-t border-gray-100 hover:bg-gray-50">
                           {result.headers.map((header) => (
-                            <td key={`${result.file.name}-${index}-${header}`} className="max-w-52 truncate px-4 py-2 text-gray-700">
+                            <td key={`${result.fileName}-${index}-${header}`} className="max-w-52 truncate px-4 py-2 text-gray-700">
                               {String(row[header] ?? "-")}
                             </td>
                           ))}
@@ -276,16 +384,16 @@ export default function UploadPage() {
         </section>
       )}
 
-      {uploadMutation.data && (
+      {uploadResult && (
         <section className="panel-card space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <h2 className="text-base font-semibold text-gray-900">적재 결과</h2>
-              <p className="mt-1 text-sm text-gray-500">raw 스키마 적재 결과와 후처리 실행 상태를 함께 확인합니다.</p>
+              <p className="mt-1 text-sm text-gray-500">raw 적재 결과와 후처리 실행 상태를 함께 확인합니다.</p>
             </div>
             <button
               onClick={handleFinalize}
-              disabled={isStartingJob || (job?.status === "queued" || job?.status === "running")}
+              disabled={isStartingJob || job?.status === "queued" || job?.status === "running"}
               className="rounded-2xl bg-orange-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-orange-500 disabled:cursor-not-allowed disabled:bg-orange-300"
             >
               {isStartingJob ? "후처리 요청 중..." : "4. core / mart 반영 실행"}
@@ -295,11 +403,11 @@ export default function UploadPage() {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-4">
               <p className="text-xs uppercase tracking-[0.18em] text-gray-500">적재 행</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">{uploadMutation.data.totalInserted.toLocaleString()}</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900">{uploadResult.totalInserted.toLocaleString()}</p>
             </div>
             <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-4">
               <p className="text-xs uppercase tracking-[0.18em] text-gray-500">건너뜀</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">{uploadMutation.data.totalSkipped.toLocaleString()}</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900">{uploadResult.totalSkipped.toLocaleString()}</p>
             </div>
             <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-4">
               <p className="text-xs uppercase tracking-[0.18em] text-gray-500">후처리</p>
@@ -324,7 +432,7 @@ export default function UploadPage() {
           )}
 
           <div className="space-y-3">
-            {uploadMutation.data.results.map((result) => (
+            {uploadResult.results.map((result) => (
               <div key={`${result.fileName}-${result.tableName}`} className="rounded-2xl border border-black/5 bg-white px-4 py-4">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div>

@@ -1,214 +1,240 @@
-# 업로드 템플릿 가이드
+# Upload Template Guide
 
-이 문서는 사용자가 어떤 형식으로 원본 데이터를 준비해야 하는지 설명합니다.
-현재 프론트의 업로드 화면은 템플릿 다운로드와 안내가 중심이며, 실제 적재 파이프라인은 별도 처리 기준을 따릅니다.
+이 문서는 업로드 화면에서 사용하는 공통 업로드 계약을 설명한다.
 
-기준 문서:
-- `docs/project-principles.md`
+관련 문서:
 - `docs/raw-to-core-mapping.md`
 - `docs/metric-catalog.md`
+- `docs/phase2-upload-schema-proposal.md`
 
-## 기본 원칙
+## 목적
 
-- 원본 파일 형식은 CSV 또는 엑셀로 받을 수 있습니다.
-- 컬럼명은 템플릿 기준을 권장합니다.
-- 회사 내부 컬럼명이 다르더라도 같은 의미로 매핑할 수 있으면 됩니다.
-- 필수 컬럼이 없으면 해당 데이터셋은 적재할 수 없습니다.
-- 권장 컬럼은 없더라도 적재는 가능하지만, 지표 품질이 떨어질 수 있습니다.
+현재 업로드 계약은 두 단계로 본다.
 
-## 먼저 맞춰야 하는 5개 데이터셋
+- Phase 1: 여러 원천 시스템에서 공통으로 받을 수 있는 최소 필수 컬럼
+- Phase 2: 운영 해상도와 P&L 설명력을 높이기 위한 선택 컬럼 확장
 
-이 프로젝트는 우선 아래 5개 데이터셋을 공통 업로드 기준으로 삼습니다.
+중요한 원칙:
+- Phase 1 필수 컬럼은 유지한다
+- Phase 2 컬럼은 대부분 optional이다
+- 기존 파일 형식은 계속 허용한다
 
-1. 재고 스냅샷
-2. 발주 / 입고
-3. 출고 / 반품
-4. 매출
-5. 비용
+## 공통 규칙
 
-실제 DB에는 운영상 이유로 발주와 입고, 출고와 반품을 각각 별도 테이블로 받습니다.
+- 업로드 파일은 CSV, XLSX, XLS를 지원한다
+- 헤더는 템플릿 기준 이름을 권장한다
+- 유사한 헤더는 내장 alias와 `ops.column_mappings`로 매핑한다
+- 필수 컬럼이 비면 해당 행은 건너뛴다
+- 선택 컬럼은 비어 있어도 적재 가능하다
 
-## 1. 재고 스냅샷 템플릿
+## 1. Inventory Snapshot
 
-사용 목적:
-- 재고 현황
-- 품절 위험
-- 과재고
-- 유통기한 옵션 지표
+테이블:
+- `raw.upload_inventory_snapshot`
 
-필수 컬럼:
+필수:
 - `snapshot_date`
 - `warehouse_id`
 - `item_id`
 - `onhand_qty`
 
-권장 컬럼:
+Phase 1 선택:
 - `lot_id`
 - `sellable_qty`
 - `blocked_qty`
-
-선택 컬럼:
 - `expiry_date`
 - `mfg_date`
 - `qc_status`
 - `hold_flag`
 - `source_system`
 
-예시 헤더:
-```csv
-snapshot_date,warehouse_id,item_id,lot_id,onhand_qty,sellable_qty,blocked_qty,expiry_date,mfg_date,qc_status,hold_flag,source_system
-```
+Phase 2 선택:
+- `owner_id`
+- `inventory_status`
+- `channel_store_id`
+- `reserved_qty`
+- `damaged_qty`
+- `in_transit_qty`
+- `safety_stock_qty`
+- `unit_cost`
+- `country`
+- `source_updated_at`
 
-## 2. 발주 템플릿
+## 2. Purchase Order
 
-사용 목적:
-- 미입고 발주
-- 리드타임
+테이블:
+- `raw.upload_purchase_order`
 
-필수 컬럼:
+필수:
 - `po_id`
 - `po_date`
 - `supplier_id`
 - `item_id`
 - `qty_ordered`
 
-권장 컬럼:
+Phase 1 선택:
 - `eta_date`
 - `unit_price`
 - `currency`
-
-선택 컬럼:
 - `incoterms`
 - `source_system`
 
-예시 헤더:
-```csv
-po_id,po_date,supplier_id,item_id,qty_ordered,eta_date,unit_price,currency,incoterms,source_system
-```
+Phase 2 선택:
+- `po_line_id`
+- `warehouse_id`
+- `country`
+- `expected_lead_time_days`
+- `order_status`
+- `buyer_id`
+- `moq_qty`
+- `pack_size`
+- `tax_amount`
+- `source_updated_at`
 
-## 3. 입고 템플릿
+## 3. Receipt
 
-사용 목적:
-- 미입고 잔량 계산
-- 발주 대비 실제 입고
-- 리드타임 계산
+테이블:
+- `raw.upload_receipt`
 
-필수 컬럼:
+필수:
 - `receipt_id`
 - `receipt_date`
 - `warehouse_id`
 - `item_id`
 - `qty_received`
 
-권장 컬럼:
+Phase 1 선택:
 - `po_id`
 - `lot_id`
-
-선택 컬럼:
 - `expiry_date`
 - `mfg_date`
 - `qc_status`
 - `source_system`
 
-예시 헤더:
-```csv
-receipt_id,receipt_date,warehouse_id,item_id,qty_received,po_id,lot_id,expiry_date,mfg_date,qc_status,source_system
-```
+Phase 2 선택:
+- `receipt_line_id`
+- `po_line_id`
+- `putaway_completed_at`
+- `inspection_result`
+- `damaged_qty`
+- `short_received_qty`
+- `excess_received_qty`
+- `carrier_id`
+- `dock_id`
+- `source_updated_at`
 
-## 4. 출고 템플릿
+## 4. Shipment
 
-사용 목적:
-- 출고 추이
-- 물류 처리량
-- 주문 대비 출고
+테이블:
+- `raw.upload_shipment`
 
-필수 컬럼:
+필수:
 - `shipment_id`
 - `ship_date`
 - `warehouse_id`
 - `item_id`
 - `qty_shipped`
 
-권장 컬럼:
-- `channel_order_id`
-- `channel_store_id`
+Phase 1 선택:
 - `lot_id`
-
-선택 컬럼:
 - `weight`
 - `volume_cbm`
+- `channel_order_id`
+- `channel_store_id`
 - `source_system`
 
-예시 헤더:
-```csv
-shipment_id,ship_date,warehouse_id,item_id,qty_shipped,lot_id,channel_order_id,channel_store_id,weight,volume_cbm,source_system
-```
+Phase 2 선택:
+- `shipment_line_id`
+- `order_id`
+- `order_line_id`
+- `country`
+- `carrier_id`
+- `tracking_no`
+- `shipping_fee`
+- `promised_ship_date`
+- `delivered_at`
+- `source_updated_at`
 
-## 5. 반품 템플릿
+## 5. Return
 
-사용 목적:
-- 반품 분석
-- 반품 사유 요약
+테이블:
+- `raw.upload_return`
 
-필수 컬럼:
+필수:
 - `return_id`
 - `return_date`
 - `warehouse_id`
 - `item_id`
 - `qty_returned`
 
-권장 컬럼:
+Phase 1 선택:
+- `lot_id`
 - `channel_order_id`
 - `reason`
 - `disposition`
-
-선택 컬럼:
-- `lot_id`
 - `source_system`
 
-예시 헤더:
-```csv
-return_id,return_date,warehouse_id,item_id,qty_returned,lot_id,channel_order_id,reason,disposition,source_system
-```
-
-## 6. 매출 템플릿
-
-사용 목적:
-- 매출
-- 매출총이익
-- 공헌이익
-
-필수 컬럼:
-- `period`
+Phase 2 선택:
+- `return_line_id`
 - `channel_store_id`
-- `item_id`
-- `gross_sales`
+- `order_id`
+- `order_line_id`
+- `refund_amount`
+- `return_shipping_fee`
+- `return_reason_code`
+- `return_quality_grade`
+- `resellable_flag`
+- `source_updated_at`
 
-권장 컬럼:
-- `discounts`
-- `refunds`
-- `fees`
-- `net_payout`
+## 6. Sales / Settlement
 
-선택 컬럼:
+테이블:
+- `raw.upload_sales`
+
+현재 의미:
+- 주문 원장 전체가 아니라 매출/정산 라인 성격이 강하다
+
+필수:
 - `settlement_id`
 - `line_no`
+- `period`
+- `channel_store_id`
 - `currency`
+- `gross_sales`
+
+Phase 1 선택:
+- `item_id`
+- `discounts`
+- `fees`
+- `refunds`
+- `net_payout`
 - `source_system`
 
-예시 헤더:
-```csv
-period,channel_store_id,item_id,gross_sales,discounts,refunds,fees,net_payout,currency,settlement_id,line_no,source_system
-```
+Phase 2 선택:
+- `order_id`
+- `order_line_id`
+- `order_date`
+- `ship_date`
+- `country`
+- `quantity_sold`
+- `unit_selling_price`
+- `tax_amount`
+- `promo_cost`
+- `platform_fee`
+- `payment_fee`
+- `coupon_amount`
+- `sales_channel_group`
+- `source_updated_at`
 
-## 7. 비용 템플릿
+## 7. Charge
 
-사용 목적:
-- 변동비
-- 공헌이익
-- 비용 배분
+테이블:
+- `raw.upload_charge`
 
-필수 컬럼:
+현재 의미:
+- 운송비, 3PL, 플랫폼 청구 등 실제 비용 라인
+
+필수:
 - `invoice_no`
 - `invoice_line_no`
 - `charge_type`
@@ -216,48 +242,35 @@ period,channel_store_id,item_id,gross_sales,discounts,refunds,fees,net_payout,cu
 - `currency`
 - `period`
 
-권장 컬럼:
+Phase 1 선택:
 - `invoice_date`
 - `vendor_partner_id`
-- `channel_store_id`
-- `warehouse_id`
-
-선택 컬럼:
-- `country`
+- `charge_basis`
 - `reference_type`
 - `reference_id`
-- `charge_basis`
+- `channel_store_id`
+- `warehouse_id`
+- `country`
 - `source_system`
 
-예시 헤더:
-```csv
-invoice_no,invoice_line_no,charge_type,amount,currency,period,invoice_date,vendor_partner_id,channel_store_id,warehouse_id,country,reference_type,reference_id,charge_basis,source_system
-```
+Phase 2 선택:
+- `supplier_id`
+- `charge_category`
+- `cost_center`
+- `item_id`
+- `allocation_key`
+- `allocation_basis_value`
+- `tax_amount`
+- `invoice_status`
+- `reference_period`
+- `accrual_flag`
+- `source_updated_at`
 
-## 필수 체크 기준
+## 추천 확장 순서
 
-업로드 전 최소한 아래는 맞아야 합니다.
+1. `upload_sales` 확장
+2. `upload_charge` 확장
+3. `upload_shipment` / `upload_return` 연결 키 확장
+4. `upload_inventory_snapshot` / `upload_purchase_order` / `upload_receipt` 운영 컬럼 확장
 
-- 날짜 컬럼은 실제 날짜여야 합니다.
-- 수량과 금액 컬럼에는 숫자만 들어가야 합니다.
-- ID 컬럼은 빈 값이 아니어야 합니다.
-- `period`는 `YYYY-MM` 형식을 권장합니다.
-- 하나의 파일 안에서 헤더는 한 번만 나와야 합니다.
-
-## 스키마와 함께 바뀌어야 하는 것
-
-템플릿을 바꾸면 아래도 함께 바뀌어야 합니다.
-
-1. `raw` 업로드 테이블
-2. `core` 표준 컬럼 매핑
-3. `mart` 집계 기준
-4. Supabase 마이그레이션
-
-즉 템플릿 문서만 바꾸는 방식은 허용하지 않습니다.
-
-## 현재 상태
-
-- 템플릿 다운로드: 가능
-- 실제 업로드 적재: 운영 파이프라인 기준으로 별도 처리
-- DB 기준 계약: `migrations/11_upload_contracts.sql`
-
+이 순서가 P&L 설명력과 SCM 추적력을 가장 빠르게 올린다.
