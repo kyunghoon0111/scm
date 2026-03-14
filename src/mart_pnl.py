@@ -248,6 +248,14 @@ def build_mart_pnl_cogs(con: duckdb.DuckDBPyConnection, config: AppConfig) -> No
     if cogs_df.height == 0:
         return
 
+    cogs_df = cogs_df.with_columns([
+        pl.col("qty_shipped").cast(pl.Float64, strict=False),
+        pl.col("qty_returned").cast(pl.Float64, strict=False),
+        pl.col("qty_net").cast(pl.Float64, strict=False),
+        pl.col("unit_cost_krw").cast(pl.Float64, strict=False),
+        pl.col("cogs_krw").cast(pl.Float64, strict=False),
+    ])
+
     # DQ assertion: no duplicate grain
     grain_counts = cogs_df.group_by(["period", "item_id", "channel_store_id"]).len()
     dups = grain_counts.filter(pl.col("len") > 1)
