@@ -583,6 +583,57 @@ def execute_finalize_job(job_id: str) -> None:
         )
 
 
+def read_pipeline_lock() -> dict[str, Any]:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT lock_id, locked, pid, started_at
+                FROM raw.system_batch_lock
+                WHERE lock_id = 1
+                """
+            )
+            row = cur.fetchone()
+            if row is None:
+                return {"lock_id": 1, "locked": False, "pid": None, "started_at": None}
+            return {
+                "lock_id": row[0],
+                "locked": bool(row[1]),
+                "pid": row[2],
+                "started_at": row[3].isoformat() if row[3] else None,
+            }
+
+
+def unlock_pipeline() -> dict[str, Any]:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE raw.system_batch_lock
+                SET locked = false,
+                    pid = NULL,
+                    started_at = NULL
+                WHERE lock_id = 1
+                """
+            )
+            conn.commit()
+    return read_pipeline_lock()
+
+
+def rollback_recent_batches(batch_count: int) -> dict[str, Any]:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT public.rollback_batches(%s)::text", [batch_count])
+            row = cur.fetchone()
+            conn.commit()
+
+    payload = row[0] if row and row[0] else "{}"
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError:
+        return {"success": False, "message": payload}
+
+
 class FinalizeJobRequest(BaseModel):
     trigger_source: str = "frontend"
 
@@ -595,6 +646,10 @@ class UploadBatchItem(BaseModel):
 
 class UploadBatchRequest(BaseModel):
     items: list[UploadBatchItem]
+
+
+class RollbackBatchRequest(BaseModel):
+    batch_count: int = 1
 
 
 app = FastAPI(title="SCM Ops Backend", version="0.1.0")
@@ -658,6 +713,22 @@ def upload_raw_batches(payload: UploadBatchRequest):
             )
 
     return {"items": results}
+
+
+@app.get("/api/ops/pipeline-lock")
+def get_pipeline_lock():
+    return read_pipeline_lock()
+
+
+@app.post("/api/ops/pipeline-lock/unlock")
+def post_unlock_pipeline():
+    return {"success": True, "lock": unlock_pipeline()}
+
+
+@app.post("/api/ops/rollback")
+def post_rollback_batches(payload: RollbackBatchRequest):
+    batch_count = max(1, min(payload.batch_count, 10))
+    return rollback_recent_batches(batch_count)
 
 
 @app.get("/api/jobs/{job_id}")

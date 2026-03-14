@@ -1,6 +1,15 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { fetchJob, fetchRecentJobs, startFinalizeJob, type BackendJobDetail, type BackendJobSummary } from "../api/backendApi";
+import {
+  fetchJob,
+  fetchPipelineLock,
+  fetchRecentJobs,
+  rollbackBatches,
+  startFinalizeJob,
+  unlockPipeline,
+  type BackendJobDetail,
+  type BackendJobSummary,
+} from "../api/backendApi";
 
 type JobFilter = "all" | "running" | "failed" | "success";
 
@@ -76,10 +85,17 @@ export default function AdminPanel() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [filter, setFilter] = useState<JobFilter>("all");
   const [message, setMessage] = useState<string | null>(null);
+  const [rollbackBatchCount, setRollbackBatchCount] = useState(1);
 
   const jobsQuery = useQuery({
     queryKey: ["admin", "jobs"],
     queryFn: () => fetchRecentJobs(30),
+    refetchInterval: 5000,
+  });
+
+  const lockQuery = useQuery({
+    queryKey: ["admin", "pipeline-lock"],
+    queryFn: fetchPipelineLock,
     refetchInterval: 5000,
   });
 
@@ -92,6 +108,29 @@ export default function AdminPanel() {
     },
     onError: (error) => {
       setMessage(error instanceof Error ? error.message : "후처리 재실행 중 오류가 발생했습니다.");
+    },
+  });
+
+  const unlockMutation = useMutation({
+    mutationFn: unlockPipeline,
+    onSuccess: async () => {
+      setMessage("파이프라인 락을 해제했습니다.");
+      await lockQuery.refetch();
+      await jobsQuery.refetch();
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : "락 해제 중 오류가 발생했습니다.");
+    },
+  });
+
+  const rollbackMutation = useMutation({
+    mutationFn: rollbackBatches,
+    onSuccess: async (result) => {
+      setMessage(result.message ?? "최근 배치 롤백을 실행했습니다.");
+      await jobsQuery.refetch();
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : "배치 롤백 중 오류가 발생했습니다.");
     },
   });
 
@@ -156,6 +195,74 @@ export default function AdminPanel() {
         <div className="panel-card">
           <p className="text-xs uppercase tracking-[0.18em] text-gray-500">최근 실패</p>
           <p className="mt-2 text-3xl font-semibold text-amber-700">{failedCount}</p>
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+        <div className="panel-card space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">운영 복구</h2>
+            <p className="mt-1 text-sm text-gray-500">터미널 없이 락 해제와 상태 복구를 실행합니다.</p>
+          </div>
+
+          <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-4 text-sm text-gray-700">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-gray-900">파이프라인 락</p>
+                <p className="mt-1 text-xs text-gray-500">후처리 파이프라인의 현재 잠금 상태입니다.</p>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-xs font-medium ${lockQuery.data?.locked ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+                {lockQuery.data?.locked ? "잠김" : "열림"}
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs text-gray-500 sm:grid-cols-2">
+              <p>PID: {lockQuery.data?.pid ?? "-"}</p>
+              <p>시작: {formatDate(lockQuery.data?.started_at)}</p>
+            </div>
+            <button
+              onClick={() => {
+                setMessage(null);
+                void unlockMutation.mutateAsync();
+              }}
+              disabled={unlockMutation.isPending}
+              className="mt-4 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-gray-700 transition hover:border-orange-300 hover:text-gray-900 disabled:bg-gray-100"
+            >
+              {unlockMutation.isPending ? "해제 중.." : "락 해제"}
+            </button>
+          </div>
+        </div>
+
+        <div className="panel-card space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">최근 배치 롤백</h2>
+            <p className="mt-1 text-sm text-gray-500">잘못 적재된 최근 배치를 되돌린 뒤 다시 적재할 수 있습니다.</p>
+          </div>
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <label className="flex-1">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-[0.18em] text-gray-500">롤백 배치 수</span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={rollbackBatchCount}
+                onChange={(event) => setRollbackBatchCount(Math.max(1, Math.min(10, Number(event.target.value) || 1)))}
+                className="filter-control w-full"
+              />
+            </label>
+            <button
+              onClick={() => {
+                setMessage(null);
+                void rollbackMutation.mutateAsync(rollbackBatchCount);
+              }}
+              disabled={rollbackMutation.isPending}
+              className="rounded-xl bg-gray-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-gray-800 disabled:bg-gray-300"
+            >
+              {rollbackMutation.isPending ? "롤백 중.." : "최근 배치 롤백"}
+            </button>
+          </div>
+          <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-3 text-sm text-gray-600">
+            업로드 실수 시 롤백 후 필요한 파일만 다시 업로드하고, 후처리 재실행 버튼을 누르면 됩니다.
+          </div>
         </div>
       </section>
 
