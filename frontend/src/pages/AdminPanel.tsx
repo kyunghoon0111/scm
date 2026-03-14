@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   fetchJob,
   fetchPipelineLock,
@@ -11,6 +11,9 @@ import {
   type BackendJobSummary,
 } from "../api/backendApi";
 
+const UploadHistory = lazy(() => import("../components/admin/UploadHistory"));
+
+type AdminTab = "jobs" | "upload-history";
 type JobFilter = "all" | "running" | "failed" | "success";
 
 function statusTone(status: string | undefined) {
@@ -82,6 +85,7 @@ function getSteps(job?: BackendJobDetail | null) {
 }
 
 export default function AdminPanel() {
+  const [activeTab, setActiveTab] = useState<AdminTab>("jobs");
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [filter, setFilter] = useState<JobFilter>("all");
   const [message, setMessage] = useState<string | null>(null);
@@ -185,6 +189,33 @@ export default function AdminPanel() {
         </div>
       </div>
 
+      {/* Tab navigation */}
+      <div className="flex gap-2">
+        {([
+          ["jobs", "작업 이력"],
+          ["upload-history", "업로드 이력"],
+        ] as [AdminTab, string][]).map(([tab, label]) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+              activeTab === tab
+                ? "bg-gray-900 text-white"
+                : "border border-black/10 bg-white text-gray-600 hover:border-orange-300 hover:text-gray-900"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "upload-history" && (
+        <Suspense fallback={<div className="panel-card py-8 text-center text-sm text-gray-500">로딩 중...</div>}>
+          <UploadHistory />
+        </Suspense>
+      )}
+
+      {activeTab === "jobs" && <>
       <section className="grid gap-4 md:grid-cols-4">
         <div className="panel-card">
           <p className="text-xs uppercase tracking-[0.18em] text-gray-500">실행 중</p>
@@ -459,6 +490,7 @@ export default function AdminPanel() {
           </div>
         </div>
       </section>
+      </>}
     </div>
   );
 }

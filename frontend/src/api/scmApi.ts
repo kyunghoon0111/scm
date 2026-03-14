@@ -27,6 +27,7 @@ import type {
   DemandPlanRow,
   ReplenishmentPlanRow,
   LeadTimePredictionRow,
+  AnomalySignalRow,
 } from "../types/scm";
 
 // ── 공통 ──
@@ -93,6 +94,8 @@ function listPeriodsInRange(fromDate: string, toDate: string): string[] {
 
 // period 컬럼이 있는 테이블만 period 필터 적용
 const TABLES_WITH_PERIOD = new Set([
+  "mart_anomaly_signals",
+  "mart_inventory_turnover",
   "mart_open_po",
   "mart_return_analysis",
   "mart_shipment_performance",
@@ -158,7 +161,9 @@ async function fetchTurnoverAnalysis(params: ScmParams) {
     fromMart("mart_inventory_turnover"),
     params,
     "mart_inventory_turnover",
-  );
+  )
+    .order("turnover_ratio", { ascending: true, nullsFirst: false })
+    .order("item_id", { ascending: true });
   return wrap<TurnoverRow>(data, error);
 }
 
@@ -558,5 +563,26 @@ export function useLeadTimePrediction(params: ScmParams) {
     queryKey: ["scm", "lead-time-prediction", params],
     queryFn: () => fetchLeadTimePrediction(params),
     ...QUERY_CONFIG.turnover,
+  });
+}
+
+// ── 이상치 탐지 ──
+
+async function fetchAnomalySignals(params: ScmParams) {
+  const { data, error } = await applyFilters(
+    fromMart("mart_anomaly_signals"),
+    params,
+    "mart_anomaly_signals",
+  )
+    .order("severity", { ascending: true })
+    .order("detected_at", { ascending: false });
+  return wrap<AnomalySignalRow>(data, error);
+}
+
+export function useAnomalySignals(params: ScmParams) {
+  return useQuery({
+    queryKey: ["anomaly", "signals", params],
+    queryFn: () => fetchAnomalySignals(params),
+    ...QUERY_CONFIG.anomaly,
   });
 }

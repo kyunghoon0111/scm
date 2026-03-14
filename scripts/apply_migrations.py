@@ -34,6 +34,8 @@ MIGRATIONS = [
     "migrations/15_public_settings_read.sql",
     "migrations/16_upload_dedup_index.sql",
     "migrations/17_public_ml_mart_access.sql",
+    "migrations/18_inventory_turnover.sql",
+    "migrations/22_anomaly_signals.sql",
 ]
 
 

@@ -14,6 +14,7 @@ import { useOperatingProfit } from "../../api/pnlApi";
 import { bucketPeriod, timeGrainLabel } from "../../lib/timeGrain";
 import { useFilterStore } from "../../store/filterStore";
 import type { OperatingProfitRow } from "../../types/pnl";
+import { exportToExcel, buildExportFileName } from "../../lib/export";
 import ChartGrainControl from "../common/ChartGrainControl";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
@@ -22,7 +23,7 @@ import KpiCard from "../common/KpiCard";
 import { fmtKrw, fmtPct } from "../../lib/format";
 
 export default function OperatingProfit() {
-  const { fromDate, toDate, groupBy, setGroupBy, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, groupBy, setGroupBy, itemId, channelStoreId, drillDown } = useFilterStore();
   const { data: resp, isLoading, error } = useOperatingProfit({
     from_date: fromDate,
     to_date: toDate,
@@ -116,7 +117,32 @@ export default function OperatingProfit() {
       <div className="panel-table">
         <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
           <h3 className="text-sm font-semibold text-gray-800">영업이익 상세</h3>
-          {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+          <div className="flex items-center gap-2">
+            {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() =>
+                exportToExcel(
+                  rows.map((row) => ({
+                    기준월: row.period,
+                    상품: row.item_id,
+                    채널: row.channel_store_id,
+                    국가: row.country,
+                    공헌이익: row.contribution_krw,
+                    고정비: row.fixed_cost_krw,
+                    영업이익: row.operating_profit_krw,
+                    이익률: row.operating_profit_pct,
+                    상태: row.coverage_flag,
+                  })),
+                  buildExportFileName("영업이익", { fromDate, toDate, itemId, channelStoreId }),
+                  "영업이익",
+                )
+              }
+            >
+              다운로드
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -137,7 +163,9 @@ export default function OperatingProfit() {
               {rows.map((row, index) => (
                 <tr
                   key={`${row.period}-${row.item_id}-${row.channel_store_id}-${index}`}
-                  className={`border-t border-gray-100 hover:bg-gray-50 ${row.coverage_flag !== "ACTUAL" ? "bg-orange-50" : ""}`}
+                  className={`border-t border-gray-100 cursor-pointer hover:bg-blue-50 ${row.coverage_flag !== "ACTUAL" ? "bg-orange-50" : ""}`}
+                  onClick={() => drillDown({ itemId: row.item_id, channelStoreId: row.channel_store_id, pnlTab: "profitability-ranking" })}
+                  title={`${row.item_id} 수익성 순위 보기`}
                 >
                   <td className="px-4 py-2">{row.period ?? "-"}</td>
                   <td className="px-4 py-2 font-mono text-xs">{row.item_id ?? "-"}</td>

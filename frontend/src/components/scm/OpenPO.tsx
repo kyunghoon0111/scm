@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useOpenPO } from "../../api/scmApi";
 import { useFilterStore } from "../../store/filterStore";
 import type { OpenPORow } from "../../types/scm";
+import { exportToExcel, buildExportFileName } from "../../lib/export";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
 import ErrorState from "../common/ErrorState";
@@ -15,7 +16,7 @@ function getStatus(row: OpenPORow): string {
 }
 
 export default function OpenPO() {
-  const { fromDate, toDate, warehouseId, itemId } = useFilterStore();
+  const { fromDate, toDate, warehouseId, itemId, drillDown } = useFilterStore();
   const { data: resp, isLoading, error } = useOpenPO({
     from_date: fromDate,
     to_date: toDate,
@@ -74,7 +75,34 @@ export default function OpenPO() {
             <h3 className="text-sm font-semibold text-gray-800">미입고 발주 목록</h3>
             <p className="text-xs text-gray-500">예정 입고일과 미입고 수량 기준으로 정렬했습니다.</p>
           </div>
-          {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+          <div className="flex items-center gap-2">
+            {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() =>
+                exportToExcel(
+                  rows.map((row) => ({
+                    기준월: row.period,
+                    발주번호: row.po_id,
+                    공급처: row.supplier_id,
+                    상품: row.item_id,
+                    "발주 수량": row.qty_ordered ?? 0,
+                    "입고 수량": row.qty_received ?? 0,
+                    미입고: row.qty_open ?? 0,
+                    발주일: row.po_date,
+                    예정일: row.eta_date,
+                    지연일: row.delay_days ?? 0,
+                    상태: getStatus(row),
+                  })),
+                  buildExportFileName("미입고발주", { fromDate, toDate, warehouseId, itemId }),
+                  "미입고발주",
+                )
+              }
+            >
+              다운로드
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -97,9 +125,11 @@ export default function OpenPO() {
               {rows.map((row, index) => (
                 <tr
                   key={`${row.po_id}-${row.item_id}-${index}`}
-                  className={`border-t border-gray-100 hover:bg-gray-50 ${
+                  className={`border-t border-gray-100 cursor-pointer hover:bg-blue-50 ${
                     (row.delay_days ?? 0) > 0 ? "bg-red-50" : ""
                   }`}
+                  onClick={() => drillDown({ itemId: row.item_id, scmTab: "lead-time" })}
+                  title={`${row.item_id} 리드타임 보기`}
                 >
                   <td className="px-4 py-2">{row.period ?? "-"}</td>
                   <td className="px-4 py-2 font-mono text-xs">{row.po_id ?? "-"}</td>

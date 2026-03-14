@@ -6,12 +6,14 @@ import {
   useProfitabilityRanking,
   useRevenue,
 } from "../../api/pnlApi";
-import { useFilterStore } from "../../store/filterStore";
+import { useFilterStore, type PnlTab } from "../../store/filterStore";
 import CoverageNotice, { type CoverageNoticeItem } from "../common/CoverageNotice";
 import KpiCard from "../common/KpiCard";
 
 export default function PnlOverview() {
-  const { fromDate, toDate, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, itemId, channelStoreId, setActivePnlTab } = useFilterStore();
+
+  const goTo = (tab: PnlTab) => () => setActivePnlTab(tab);
 
   const params = {
     from_date: fromDate,
@@ -136,11 +138,11 @@ export default function PnlOverview() {
             <h3 className="mt-2 text-lg font-semibold text-gray-900">매출부터 영업이익까지 바로 확인</h3>
           </div>
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
-            <KpiCard title="순매출" value={summary.netRevenue} unit="KRW" coverageFlag={revenue.data?.meta.coverage_flag ?? null} />
-            <KpiCard title="매출원가" value={summary.totalCogs} unit="KRW" coverageFlag={cogs.data?.meta.coverage_flag ?? null} />
-            <KpiCard title="공헌이익" value={summary.totalContribution} unit="KRW" coverageFlag={contribution.data?.meta.coverage_flag ?? null} />
-            <KpiCard title="영업이익" value={summary.totalOperatingProfit} unit="KRW" coverageFlag={operatingProfit.data?.meta.coverage_flag ?? null} />
-            <KpiCard title="영업이익률" value={summary.operatingMargin !== null ? `${summary.operatingMargin.toFixed(1)}%` : null} />
+            <KpiCard title="순매출" value={summary.netRevenue} unit="KRW" coverageFlag={revenue.data?.meta.coverage_flag ?? null} onClick={goTo("revenue")} linkLabel="매출 상세" />
+            <KpiCard title="매출원가" value={summary.totalCogs} unit="KRW" coverageFlag={cogs.data?.meta.coverage_flag ?? null} onClick={goTo("cogs")} linkLabel="COGS 상세" />
+            <KpiCard title="공헌이익" value={summary.totalContribution} unit="KRW" coverageFlag={contribution.data?.meta.coverage_flag ?? null} onClick={goTo("contribution")} linkLabel="공헌이익 상세" />
+            <KpiCard title="영업이익" value={summary.totalOperatingProfit} unit="KRW" coverageFlag={operatingProfit.data?.meta.coverage_flag ?? null} onClick={goTo("operating-profit")} linkLabel="영업이익 상세" />
+            <KpiCard title="영업이익률" value={summary.operatingMargin !== null ? `${summary.operatingMargin.toFixed(1)}%` : null} onClick={goTo("operating-profit")} linkLabel="영업이익 상세" />
           </div>
         </div>
 
@@ -150,10 +152,10 @@ export default function PnlOverview() {
             <h3 className="mt-2 text-lg font-semibold text-gray-900">손익 해석에 함께 보는 숫자</h3>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <KpiCard title="할인+환불" value={summary.discountAndRefund} unit="KRW" />
-            <KpiCard title="적자 SKU" value={summary.lossRows} unit="건" />
-            <KpiCard title="흑자 비중" value={summary.profitableShare !== null ? `${summary.profitableShare.toFixed(1)}%` : null} />
-            <KpiCard title="상위 SKU" value={summary.topSku} />
+            <KpiCard title="할인+환불" value={summary.discountAndRefund} unit="KRW" onClick={goTo("revenue")} linkLabel="매출 상세" />
+            <KpiCard title="적자 SKU" value={summary.lossRows} unit="건" onClick={goTo("operating-profit")} linkLabel="영업이익 상세" />
+            <KpiCard title="흑자 비중" value={summary.profitableShare !== null ? `${summary.profitableShare.toFixed(1)}%` : null} onClick={goTo("profitability-ranking")} linkLabel="수익성 순위" />
+            <KpiCard title="상위 SKU" value={summary.topSku} onClick={goTo("profitability-ranking")} linkLabel="수익성 순위" />
           </div>
           <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-3 text-sm text-gray-600">
             P&amp;L은 매출, 원가, 비용이 모두 맞아야 신뢰도가 올라갑니다. 부족한 원천은 아래 안내에서 바로 확인하세요.

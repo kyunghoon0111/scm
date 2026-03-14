@@ -15,6 +15,7 @@ import { useRevenue } from "../../api/pnlApi";
 import { bucketPeriod, timeGrainLabel } from "../../lib/timeGrain";
 import { useFilterStore } from "../../store/filterStore";
 import type { RevenueRow } from "../../types/pnl";
+import { exportToExcel, buildExportFileName } from "../../lib/export";
 import ChartGrainControl from "../common/ChartGrainControl";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
@@ -23,7 +24,7 @@ import KpiCard from "../common/KpiCard";
 import { fmtKrw } from "../../lib/format";
 
 export default function Revenue() {
-  const { fromDate, toDate, groupBy, setGroupBy, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, groupBy, setGroupBy, itemId, channelStoreId, drillDown } = useFilterStore();
   const { data: resp, isLoading, error } = useRevenue({
     from_date: fromDate,
     to_date: toDate,
@@ -190,7 +191,33 @@ export default function Revenue() {
       <div className="panel-table">
         <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
           <h3 className="text-sm font-semibold text-gray-800">매출 상세</h3>
-          {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+          <div className="flex items-center gap-2">
+            {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() =>
+                exportToExcel(
+                  rows.map((row) => ({
+                    기준월: row.period,
+                    상품: row.item_id,
+                    채널: row.channel_store_id,
+                    국가: row.country,
+                    출처: row.source,
+                    총매출: row.gross_sales_krw,
+                    할인: row.discounts_krw,
+                    환불: row.refunds_krw,
+                    순매출: row.net_revenue_krw,
+                    상태: row.coverage_flag,
+                  })),
+                  buildExportFileName("매출", { fromDate, toDate, itemId, channelStoreId }),
+                  "매출",
+                )
+              }
+            >
+              다운로드
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -212,7 +239,9 @@ export default function Revenue() {
               {rows.map((row, index) => (
                 <tr
                   key={`${row.period}-${row.item_id}-${row.channel_store_id}-${index}`}
-                  className={`border-t border-gray-100 hover:bg-gray-50 ${row.coverage_flag !== "ACTUAL" ? "bg-orange-50" : ""}`}
+                  className={`border-t border-gray-100 cursor-pointer hover:bg-blue-50 ${row.coverage_flag !== "ACTUAL" ? "bg-orange-50" : ""}`}
+                  onClick={() => drillDown({ itemId: row.item_id, channelStoreId: row.channel_store_id, pnlTab: "cogs" })}
+                  title={`${row.item_id} COGS 보기`}
                 >
                   <td className="px-4 py-2">{row.period ?? "-"}</td>
                   <td className="px-4 py-2 font-mono text-xs">{row.item_id ?? "-"}</td>

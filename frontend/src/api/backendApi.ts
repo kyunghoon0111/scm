@@ -35,6 +35,38 @@ export interface RawUploadBatchResult {
   error: string | null;
 }
 
+export interface UploadHistoryItem {
+  batch_id: number;
+  file_name: string;
+  file_hash: string;
+  table_name: string | null;
+  row_count: number;
+  status: string;
+  error_msg: string | null;
+  processed_at: string | null;
+  batch_started_at: string | null;
+  batch_finished_at: string | null;
+  batch_status: string | null;
+  batch_file_count: number | null;
+  batch_rows_ingested: number | null;
+}
+
+export interface UploadHistoryResponse {
+  items: UploadHistoryItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface UploadHistoryParams {
+  limit?: number;
+  offset?: number;
+  status?: string;
+  table_name?: string;
+  date_from?: string;
+  date_to?: string;
+}
+
 const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
 
 export async function startFinalizeJob() {
@@ -83,6 +115,23 @@ export async function uploadRawBatches(items: RawUploadBatchItem[], force = fals
   }
 
   return response.json() as Promise<{ items: RawUploadBatchResult[] }>;
+}
+
+export async function fetchUploadHistory(params: UploadHistoryParams = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.limit) searchParams.set("limit", String(params.limit));
+  if (params.offset) searchParams.set("offset", String(params.offset));
+  if (params.status) searchParams.set("status", params.status);
+  if (params.table_name) searchParams.set("table_name", params.table_name);
+  if (params.date_from) searchParams.set("date_from", params.date_from);
+  if (params.date_to) searchParams.set("date_to", params.date_to);
+  const qs = searchParams.toString();
+  const response = await fetch(`${API_URL}/api/ops/upload-history${qs ? `?${qs}` : ""}`);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Failed to fetch upload history.");
+  }
+  return response.json() as Promise<UploadHistoryResponse>;
 }
 
 export async function fetchPipelineLock() {

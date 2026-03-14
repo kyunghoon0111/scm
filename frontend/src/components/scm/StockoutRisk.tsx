@@ -12,6 +12,7 @@ import {
 import { useStockoutRisk } from "../../api/scmApi";
 import { useFilterStore } from "../../store/filterStore";
 import type { StockoutRiskRow } from "../../types/scm";
+import { exportToExcel, buildExportFileName } from "../../lib/export";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
 import ErrorState from "../common/ErrorState";
@@ -28,7 +29,7 @@ function rowBgClass(row: StockoutRiskRow): string {
 }
 
 export default function StockoutRisk() {
-  const { fromDate, toDate, warehouseId, itemId } = useFilterStore();
+  const { fromDate, toDate, warehouseId, itemId, drillDown } = useFilterStore();
   const { data: resp, isLoading, error } = useStockoutRisk({
     from_date: fromDate,
     to_date: toDate,
@@ -136,7 +137,32 @@ export default function StockoutRisk() {
       <div className="panel-table">
         <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
           <h3 className="text-sm font-semibold text-gray-800">위험 품목 목록</h3>
-          {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+          <div className="flex items-center gap-2">
+            {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() =>
+                exportToExcel(
+                  rows.map((row) => ({
+                    기준일: row.as_of_date,
+                    창고: row.warehouse_id,
+                    상품: row.item_id,
+                    "판매 가능": row.sellable_qty ?? 0,
+                    "일평균 수요": row.avg_daily_demand ?? 0,
+                    "커버 일수": row.days_of_cover,
+                    "기준 일수": row.threshold_days,
+                    품절: isStockout(row) ? "예" : "-",
+                    위험: row.risk_flag ? "예" : "-",
+                  })),
+                  buildExportFileName("품절위험", { fromDate, toDate, warehouseId, itemId }),
+                  "품절위험",
+                )
+              }
+            >
+              다운로드
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -157,7 +183,9 @@ export default function StockoutRisk() {
               {rows.map((row, index) => (
                 <tr
                   key={`${row.item_id}-${row.warehouse_id}-${row.as_of_date}-${index}`}
-                  className={`border-t border-gray-100 hover:bg-gray-50 ${rowBgClass(row)}`}
+                  className={`border-t border-gray-100 cursor-pointer hover:bg-blue-50 ${rowBgClass(row)}`}
+                  onClick={() => drillDown({ itemId: row.item_id, warehouseId: row.warehouse_id, scmTab: "open-po" })}
+                  title={`${row.item_id} 발주 현황 보기`}
                 >
                   <td className="px-4 py-2 text-xs">{row.as_of_date}</td>
                   <td className="px-4 py-2">{row.warehouse_id}</td>

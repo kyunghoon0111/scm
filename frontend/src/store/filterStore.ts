@@ -17,6 +17,18 @@ function getCurrentPeriod(): string {
 
 export type TimeGrain = "day" | "week" | "month" | "year";
 
+export type ScmTab = "onhand" | "turnover" | "stockout" | "open-po" | "lead-time" | "shipment-return" | "constraint" | "forecast";
+export type PnlTab = "revenue" | "cogs" | "contribution" | "operating-profit" | "profitability-ranking";
+
+export interface DrillDownTarget {
+  scmTab?: ScmTab;
+  pnlTab?: PnlTab;
+  itemId?: string | null;
+  warehouseId?: string | null;
+  channelStoreId?: string | null;
+  supplierId?: string | null;
+}
+
 interface FilterState {
   fromDate: string;
   toDate: string;
@@ -26,7 +38,10 @@ interface FilterState {
   warehouseId: string | null;
   itemId: string | null;
   channelStoreId: string | null;
+  supplierId: string | null;
   snapshotDate: string | null;
+  activeScmTab: ScmTab;
+  activePnlTab: PnlTab;
   setFromDate: (value: string) => void;
   setToDate: (value: string) => void;
   setGroupBy: (value: TimeGrain) => void;
@@ -35,7 +50,12 @@ interface FilterState {
   setWarehouseId: (id: string | null) => void;
   setItemId: (id: string | null) => void;
   setChannelStoreId: (id: string | null) => void;
+  setSupplierId: (id: string | null) => void;
   setSnapshotDate: (date: string | null) => void;
+  setActiveScmTab: (tab: ScmTab) => void;
+  setActivePnlTab: (tab: PnlTab) => void;
+  drillDown: (target: DrillDownTarget) => void;
+  clearDrillFilters: () => void;
 }
 
 function syncPeriod(fromDate: string, toDate: string) {
@@ -59,7 +79,10 @@ export const useFilterStore = create<FilterState>((set) => ({
   warehouseId: null,
   itemId: null,
   channelStoreId: null,
+  supplierId: null,
   snapshotDate: null,
+  activeScmTab: "onhand",
+  activePnlTab: "revenue",
   setFromDate: (fromDate) =>
     set((state) => ({
       fromDate,
@@ -91,5 +114,19 @@ export const useFilterStore = create<FilterState>((set) => ({
   setWarehouseId: (warehouseId) => set({ warehouseId }),
   setItemId: (itemId) => set({ itemId }),
   setChannelStoreId: (channelStoreId) => set({ channelStoreId }),
+  setSupplierId: (supplierId) => set({ supplierId }),
   setSnapshotDate: (snapshotDate) => set({ snapshotDate }),
+  setActiveScmTab: (activeScmTab) => set({ activeScmTab }),
+  setActivePnlTab: (activePnlTab) => set({ activePnlTab }),
+  drillDown: (target) =>
+    set((state) => ({
+      ...(target.itemId !== undefined ? { itemId: target.itemId } : {}),
+      ...(target.warehouseId !== undefined ? { warehouseId: target.warehouseId } : {}),
+      ...(target.channelStoreId !== undefined ? { channelStoreId: target.channelStoreId } : {}),
+      ...(target.supplierId !== undefined ? { supplierId: target.supplierId } : {}),
+      ...(target.scmTab ? { activeScmTab: target.scmTab } : {}),
+      ...(target.pnlTab ? { activePnlTab: target.pnlTab } : {}),
+    })),
+  clearDrillFilters: () =>
+    set({ itemId: null, warehouseId: null, channelStoreId: null, supplierId: null }),
 }));

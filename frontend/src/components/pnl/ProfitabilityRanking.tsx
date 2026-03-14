@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useProfitabilityRanking } from "../../api/pnlApi";
 import { useFilterStore } from "../../store/filterStore";
 import type { ProfitabilityRow } from "../../types/pnl";
+import { exportToExcel, buildExportFileName } from "../../lib/export";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
 import ErrorState from "../common/ErrorState";
@@ -9,7 +10,7 @@ import KpiCard from "../common/KpiCard";
 import { fmtKrw } from "../../lib/format";
 
 export default function ProfitabilityRanking() {
-  const { fromDate, toDate, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, itemId, channelStoreId, drillDown } = useFilterStore();
   const { data: resp, isLoading, error } = useProfitabilityRanking({
     from_date: fromDate,
     to_date: toDate,
@@ -84,7 +85,34 @@ export default function ProfitabilityRanking() {
             <h3 className="text-sm font-semibold text-gray-800">수익성 순위</h3>
             <p className="text-xs text-gray-500">공헌이익 기준으로 상위 상품과 채널 조합을 정렬합니다.</p>
           </div>
-          {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+          <div className="flex items-center gap-2">
+            {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() =>
+                exportToExcel(
+                  sortedRows.map((row) => ({
+                    순위: row.rank_by_contribution,
+                    기준월: row.period,
+                    상품: row.item_id,
+                    채널: row.channel_store_id,
+                    국가: row.country,
+                    순매출: row.net_revenue_krw,
+                    매출총이익: row.gross_margin_krw,
+                    매출총이익률: row.gross_margin_pct,
+                    공헌이익: row.contribution_krw,
+                    공헌율: row.contribution_pct,
+                    커버리지: row.coverage_flag,
+                  })),
+                  buildExportFileName("수익성순위", { fromDate, toDate, itemId, channelStoreId }),
+                  "수익성순위",
+                )
+              }
+            >
+              다운로드
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -105,7 +133,12 @@ export default function ProfitabilityRanking() {
             </thead>
             <tbody>
               {sortedRows.map((row, index) => (
-                <tr key={`${row.period}-${row.item_id}-${row.channel_store_id}-${index}`} className="border-t border-gray-100 hover:bg-gray-50">
+                <tr
+                  key={`${row.period}-${row.item_id}-${row.channel_store_id}-${index}`}
+                  className="border-t border-gray-100 cursor-pointer hover:bg-blue-50"
+                  onClick={() => drillDown({ itemId: row.item_id, channelStoreId: row.channel_store_id, pnlTab: "revenue" })}
+                  title={`${row.item_id} 매출 상세 보기`}
+                >
                   <td className="px-4 py-2 text-right font-semibold text-orange-700">{row.rank_by_contribution}</td>
                   <td className="px-4 py-2">{row.period}</td>
                   <td className="px-4 py-2 font-mono text-xs">{row.item_id}</td>

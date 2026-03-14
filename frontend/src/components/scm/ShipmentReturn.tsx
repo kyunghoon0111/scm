@@ -4,6 +4,7 @@ import { useReturnAnalysis, useShipmentDaily } from "../../api/scmApi";
 import { bucketDate, timeGrainLabel } from "../../lib/timeGrain";
 import { useFilterStore } from "../../store/filterStore";
 import type { ReturnAnalysisRow, ShipmentDailyRow } from "../../types/scm";
+import { exportToExcel, buildExportFileName } from "../../lib/export";
 import ChartGrainControl from "../common/ChartGrainControl";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
@@ -16,7 +17,7 @@ function fmtQty(value: number | null | undefined): string {
 }
 
 export default function ShipmentReturn() {
-  const { fromDate, toDate, groupBy, setGroupBy, warehouseId, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, groupBy, setGroupBy, warehouseId, itemId, channelStoreId, drillDown } = useFilterStore();
   const shipmentQuery = useShipmentDaily({
     from_date: fromDate,
     to_date: toDate,
@@ -139,7 +140,29 @@ export default function ShipmentReturn() {
               <h3 className="text-sm font-semibold text-gray-800">출고 일자별 상세</h3>
               <p className="text-xs text-gray-500">창고 기준 출고 흐름과 주문 수를 함께 봅니다.</p>
             </div>
-            {metaFlag && <CoverageBadge flag={metaFlag} />}
+            <div className="flex items-center gap-2">
+              {metaFlag && <CoverageBadge flag={metaFlag} />}
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                onClick={() =>
+                  exportToExcel(
+                    shipments.map((row) => ({
+                      출고일: row.ship_date,
+                      창고: row.warehouse_id,
+                      "출고 건수": row.shipment_count,
+                      "출고 수량": row.qty_shipped,
+                      "주문 수": row.unique_orders,
+                      "상품 수": row.unique_items,
+                    })),
+                    buildExportFileName("출고상세", { fromDate, toDate, warehouseId }),
+                    "출고상세",
+                  )
+                }
+              >
+                다운로드
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -155,7 +178,12 @@ export default function ShipmentReturn() {
               </thead>
               <tbody>
                 {shipments.map((row, index) => (
-                  <tr key={`${row.ship_date}-${row.warehouse_id}-${index}`} className="border-t border-gray-100 hover:bg-gray-50">
+                  <tr
+                    key={`${row.ship_date}-${row.warehouse_id}-${index}`}
+                    className="border-t border-gray-100 cursor-pointer hover:bg-blue-50"
+                    onClick={() => drillDown({ warehouseId: row.warehouse_id, scmTab: "onhand" })}
+                    title={`${row.warehouse_id} 재고 현황 보기`}
+                  >
                     <td className="px-4 py-2">{row.ship_date}</td>
                     <td className="px-4 py-2">{row.warehouse_id}</td>
                     <td className="px-4 py-2 text-right">{row.shipment_count.toLocaleString()}</td>
@@ -170,9 +198,29 @@ export default function ShipmentReturn() {
         </div>
 
         <div className="panel-table">
-          <div className="border-b border-black/5 px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-800">반품 사유 요약</h3>
-            <p className="text-xs text-gray-500">반품 사유별 건수와 반품률을 함께 봅니다.</p>
+          <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">반품 사유 요약</h3>
+              <p className="text-xs text-gray-500">반품 사유별 건수와 반품률을 함께 봅니다.</p>
+            </div>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() =>
+                exportToExcel(
+                  returnReasonRows.map((row) => ({
+                    사유: row.reason,
+                    "반품 건수": row.returnCount,
+                    "반품 수량": row.qtyReturned,
+                    반품률: row.returnRate !== null ? `${(row.returnRate * 100).toFixed(1)}%` : "-",
+                  })),
+                  buildExportFileName("반품사유", { fromDate, toDate, warehouseId, itemId, channelStoreId }),
+                  "반품사유",
+                )
+              }
+            >
+              다운로드
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

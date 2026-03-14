@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useCOGS } from "../../api/pnlApi";
 import { useFilterStore } from "../../store/filterStore";
 import type { COGSRow } from "../../types/pnl";
+import { exportToExcel, buildExportFileName } from "../../lib/export";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
 import ErrorState from "../common/ErrorState";
@@ -9,7 +10,7 @@ import KpiCard from "../common/KpiCard";
 import { fmtKrw } from "../../lib/format";
 
 export default function COGS() {
-  const { fromDate, toDate, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, itemId, channelStoreId, drillDown } = useFilterStore();
   const { data: resp, isLoading, error } = useCOGS({
     from_date: fromDate,
     to_date: toDate,
@@ -86,7 +87,33 @@ export default function COGS() {
       <div className="panel-table">
         <div className="flex items-center justify-between border-b border-black/5 px-4 py-3">
           <h3 className="text-sm font-semibold text-gray-800">매출원가 상세</h3>
-          {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+          <div className="flex items-center gap-2">
+            {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() =>
+                exportToExcel(
+                  rows.map((row) => ({
+                    기준월: row.period,
+                    상품: row.item_id,
+                    채널: row.channel_store_id,
+                    국가: row.country,
+                    출고: row.qty_shipped ?? 0,
+                    반품: row.qty_returned ?? 0,
+                    순수량: row.qty_net ?? 0,
+                    단위원가: row.unit_cost_krw,
+                    매출원가: row.cogs_krw,
+                    커버리지: row.coverage_flag,
+                  })),
+                  buildExportFileName("매출원가", { fromDate, toDate, itemId, channelStoreId }),
+                  "매출원가",
+                )
+              }
+            >
+              다운로드
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -108,9 +135,11 @@ export default function COGS() {
               {rows.map((row, index) => (
                 <tr
                   key={`${row.period}-${row.item_id}-${row.channel_store_id}-${index}`}
-                  className={`border-t border-gray-100 hover:bg-gray-50 ${
+                  className={`border-t border-gray-100 cursor-pointer hover:bg-blue-50 ${
                     row.coverage_flag !== "ACTUAL" ? "bg-orange-50" : ""
                   }`}
+                  onClick={() => drillDown({ itemId: row.item_id, channelStoreId: row.channel_store_id, pnlTab: "contribution" })}
+                  title={`${row.item_id} 공헌이익 보기`}
                 >
                   <td className="px-4 py-2">{row.period ?? "-"}</td>
                   <td className="px-4 py-2 font-mono text-xs">{row.item_id ?? "-"}</td>

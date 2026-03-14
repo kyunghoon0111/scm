@@ -12,7 +12,10 @@ export default function GlobalFilter() {
     setWarehouseId,
     setItemId,
     setChannelStoreId,
+    clearDrillFilters,
   } = useFilterStore();
+
+  const hasDrillFilter = !!(warehouseId || itemId || channelStoreId);
 
   return (
     <div className="space-y-3">
@@ -81,9 +84,20 @@ export default function GlobalFilter() {
         </div>
       </div>
 
-      <p className="px-1 text-xs text-gray-500">
-        집계 단위는 모든 화면에 고정하지 않고, 추이 차트 안에서만 일·주·월·년으로 바꿀 수 있게 두었습니다.
-      </p>
+      <div className="flex items-center gap-3 px-1">
+        <p className="text-xs text-gray-500">
+          집계 단위는 모든 화면에 고정하지 않고, 추이 차트 안에서만 일·주·월·년으로 바꿀 수 있게 두었습니다.
+        </p>
+        {hasDrillFilter && (
+          <button
+            type="button"
+            onClick={clearDrillFilters}
+            className="shrink-0 rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-200"
+          >
+            필터 초기화
+          </button>
+        )}
+      </div>
     </div>
   );
 }

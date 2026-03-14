@@ -752,6 +752,91 @@ def rollback_recent_batches(batch_count: int) -> dict[str, Any]:
         return {"success": False, "message": payload}
 
 
+def list_upload_history(
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    status: str | None = None,
+    table_name: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> dict[str, Any]:
+    conditions: list[str] = []
+    params: list[Any] = []
+
+    if status:
+        conditions.append("f.status = %s")
+        params.append(status)
+    if table_name:
+        conditions.append("f.table_name = %s")
+        params.append(table_name)
+    if date_from:
+        conditions.append("f.processed_at >= %s::timestamp")
+        params.append(date_from)
+    if date_to:
+        conditions.append("f.processed_at < (%s::timestamp + interval '1 day')")
+        params.append(date_to)
+
+    where_clause = (" AND " + " AND ".join(conditions)) if conditions else ""
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT COUNT(*) FROM raw.system_file_log f
+                WHERE 1=1 {where_clause}
+                """,
+                params,
+            )
+            total = cur.fetchone()[0]
+
+            cur.execute(
+                f"""
+                SELECT
+                    f.batch_id,
+                    f.file_name,
+                    f.file_hash,
+                    f.table_name,
+                    f.row_count,
+                    f.status,
+                    f.error_msg,
+                    f.processed_at,
+                    b.started_at   AS batch_started_at,
+                    b.finished_at  AS batch_finished_at,
+                    b.status       AS batch_status,
+                    b.file_count   AS batch_file_count,
+                    b.rows_ingested AS batch_rows_ingested
+                FROM raw.system_file_log f
+                LEFT JOIN raw.system_batch_log b ON f.batch_id = b.batch_id
+                WHERE 1=1 {where_clause}
+                ORDER BY f.processed_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                params + [limit, offset],
+            )
+            rows = cur.fetchall()
+
+    items = []
+    for row in rows:
+        items.append({
+            "batch_id": row[0],
+            "file_name": row[1],
+            "file_hash": row[2],
+            "table_name": row[3],
+            "row_count": row[4],
+            "status": row[5],
+            "error_msg": row[6],
+            "processed_at": row[7].isoformat() if row[7] else None,
+            "batch_started_at": row[8].isoformat() if row[8] else None,
+            "batch_finished_at": row[9].isoformat() if row[9] else None,
+            "batch_status": row[10],
+            "batch_file_count": row[11],
+            "batch_rows_ingested": row[12],
+        })
+
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
 class FinalizeJobRequest(BaseModel):
     trigger_source: str = "frontend"
 
@@ -801,6 +886,8 @@ MIGRATION_FILES = [
     "migrations/15_public_settings_read.sql",
     "migrations/16_upload_dedup_index.sql",
     "migrations/17_public_ml_mart_access.sql",
+    "migrations/18_inventory_turnover.sql",
+    "migrations/22_anomaly_signals.sql",
 ]
 
 
@@ -902,6 +989,27 @@ def upload_raw_batches(payload: UploadBatchRequest):
             )
 
     return {"items": results}
+
+
+@app.get("/api/ops/upload-history")
+def get_upload_history(
+    limit: int = 50,
+    offset: int = 0,
+    status: str | None = None,
+    table_name: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+):
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    return list_upload_history(
+        limit=limit,
+        offset=offset,
+        status=status,
+        table_name=table_name,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
 
 @app.get("/api/ops/pipeline-lock")

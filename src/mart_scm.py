@@ -947,6 +947,119 @@ def build_mart_return_daily(
 
 
 # ---------------------------------------------------------------------------
+# 12. mart_inventory_turnover
+# ---------------------------------------------------------------------------
+
+def build_mart_inventory_turnover(
+    con: duckdb.DuckDBPyConnection,
+    config: AppConfig,
+) -> pl.DataFrame:
+    """Build mart.mart_inventory_turnover.
+
+    재고회전율 = 출고수량 / 평균재고  (월별·품목·창고)
+    평균재고 = (월초 + 월말 스냅샷) / 2
+    days_on_hand = 365 / turnover_ratio
+    """
+    # 월별 기초/기말 재고 (스냅샷 기반)
+    inv_df = _safe_query(con, """
+        SELECT
+            STRFTIME(snapshot_date, '%Y-%m') AS period,
+            item_id,
+            warehouse_id,
+            MIN(snapshot_date) AS first_date,
+            MAX(snapshot_date) AS last_date
+        FROM core.fact_inventory_snapshot
+        GROUP BY period, item_id, warehouse_id
+    """)
+    if inv_df.height == 0:
+        _write_mart(con, pl.DataFrame(), "mart.mart_inventory_turnover")
+        return pl.DataFrame()
+
+    # 기초 재고 (각 월의 첫 스냅샷)
+    begin_df = _safe_query(con, """
+        WITH ranked AS (
+            SELECT
+                STRFTIME(snapshot_date, '%Y-%m') AS period,
+                item_id, warehouse_id,
+                SUM(onhand_qty) AS onhand_qty,
+                snapshot_date,
+                ROW_NUMBER() OVER (
+                    PARTITION BY STRFTIME(snapshot_date, '%Y-%m'), item_id, warehouse_id
+                    ORDER BY snapshot_date ASC
+                ) AS rn
+            FROM core.fact_inventory_snapshot
+            GROUP BY snapshot_date, STRFTIME(snapshot_date, '%Y-%m'), item_id, warehouse_id
+        )
+        SELECT period, item_id, warehouse_id, onhand_qty AS begin_qty
+        FROM ranked WHERE rn = 1
+    """)
+
+    # 기말 재고 (각 월의 마지막 스냅샷)
+    end_df = _safe_query(con, """
+        WITH ranked AS (
+            SELECT
+                STRFTIME(snapshot_date, '%Y-%m') AS period,
+                item_id, warehouse_id,
+                SUM(onhand_qty) AS onhand_qty,
+                snapshot_date,
+                ROW_NUMBER() OVER (
+                    PARTITION BY STRFTIME(snapshot_date, '%Y-%m'), item_id, warehouse_id
+                    ORDER BY snapshot_date DESC
+                ) AS rn
+            FROM core.fact_inventory_snapshot
+            GROUP BY snapshot_date, STRFTIME(snapshot_date, '%Y-%m'), item_id, warehouse_id
+        )
+        SELECT period, item_id, warehouse_id, onhand_qty AS end_qty
+        FROM ranked WHERE rn = 1
+    """)
+
+    # 월별 출고수량
+    ship_df = _safe_query(con, """
+        SELECT
+            STRFTIME(ship_date, '%Y-%m') AS period,
+            item_id, warehouse_id,
+            SUM(qty_shipped) AS total_shipped
+        FROM core.fact_shipment
+        GROUP BY period, item_id, warehouse_id
+    """)
+
+    join_keys = ["period", "item_id", "warehouse_id"]
+
+    # 기초 + 기말 → 평균재고
+    avg_inv = begin_df.join(end_df, on=join_keys, how="outer_coalesce").with_columns([
+        (
+            (pl.col("begin_qty").fill_null(0) + pl.col("end_qty").fill_null(0)) / 2
+        ).alias("avg_inventory"),
+    ]).select(join_keys + ["avg_inventory"])
+
+    # 출고 조인
+    result = avg_inv.join(ship_df, on=join_keys, how="left").with_columns([
+        pl.col("total_shipped").fill_null(0).alias("cogs_or_shipment"),
+    ])
+
+    # 회전율 계산
+    result = result.with_columns([
+        pl.when(pl.col("avg_inventory") > 0)
+        .then(pl.col("cogs_or_shipment") / pl.col("avg_inventory"))
+        .otherwise(None)
+        .alias("turnover_ratio"),
+    ]).with_columns([
+        pl.when(pl.col("turnover_ratio").is_not_null() & (pl.col("turnover_ratio") > 0))
+        .then(365.0 / pl.col("turnover_ratio"))
+        .otherwise(None)
+        .alias("days_on_hand"),
+    ])
+
+    result = result.select([
+        "period", "item_id", "warehouse_id",
+        "avg_inventory", "cogs_or_shipment", "turnover_ratio", "days_on_hand",
+    ])
+
+    _write_mart(con, result, "mart.mart_inventory_turnover")
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
@@ -962,6 +1075,7 @@ _MART_BUILDERS = [
     ("mart_shipment_daily",        build_mart_shipment_daily),
     ("mart_return_analysis",       build_mart_return_analysis),
     ("mart_return_daily",          build_mart_return_daily),
+    ("mart_inventory_turnover",    build_mart_inventory_turnover),
 ]
 
 

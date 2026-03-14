@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { useLeadTime } from "../../api/scmApi";
 import { useFilterStore } from "../../store/filterStore";
 import type { LeadTimeRow } from "../../types/scm";
+import { exportToExcel, buildExportFileName } from "../../lib/export";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
 import ErrorState from "../common/ErrorState";
@@ -29,7 +30,7 @@ function weightedAverage(rows: LeadTimeRow[], picker: (row: LeadTimeRow) => numb
 }
 
 export default function LeadTime() {
-  const { fromDate, toDate, itemId } = useFilterStore();
+  const { fromDate, toDate, itemId, drillDown } = useFilterStore();
   const { data: resp, isLoading, error } = useLeadTime({
     from_date: fromDate,
     to_date: toDate,
@@ -123,7 +124,33 @@ export default function LeadTime() {
             <h3 className="text-sm font-semibold text-gray-800">리드타임 상세</h3>
             <p className="text-xs text-gray-500">공급처와 상품 기준으로 리드타임 분포와 지연 비율을 보여줍니다.</p>
           </div>
-          {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+          <div className="flex items-center gap-2">
+            {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() =>
+                exportToExcel(
+                  rows.map((row) => ({
+                    기준월: row.period,
+                    공급처: row.supplier_id,
+                    상품: row.item_id,
+                    표본: row.total_count,
+                    "평균 리드타임": row.avg_lead_days,
+                    중앙값: row.median_lead_days,
+                    최소: row.min_lead_days,
+                    최대: row.max_lead_days,
+                    "지연 비중": row.late_po_ratio !== null ? row.late_po_ratio : null,
+                    "평균 지연": row.avg_delay_days,
+                  })),
+                  buildExportFileName("리드타임", { fromDate, toDate, itemId }),
+                  "리드타임",
+                )
+              }
+            >
+              다운로드
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -143,7 +170,12 @@ export default function LeadTime() {
             </thead>
             <tbody>
               {rows.map((row, index) => (
-                <tr key={`${row.period}-${row.supplier_id}-${row.item_id}-${index}`} className="border-t border-gray-100 hover:bg-gray-50">
+                <tr
+                  key={`${row.period}-${row.supplier_id}-${row.item_id}-${index}`}
+                  className="border-t border-gray-100 cursor-pointer hover:bg-blue-50"
+                  onClick={() => drillDown({ itemId: row.item_id, scmTab: "open-po" })}
+                  title={`${row.item_id} 발주 현황 보기`}
+                >
                   <td className="px-4 py-2">{row.period}</td>
                   <td className="px-4 py-2">{row.supplier_id}</td>
                   <td className="px-4 py-2 font-mono text-xs">{row.item_id}</td>

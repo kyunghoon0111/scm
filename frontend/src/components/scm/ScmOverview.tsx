@@ -7,11 +7,14 @@ import {
   useStockoutRisk,
 } from "../../api/scmApi";
 import { useFilterStore } from "../../store/filterStore";
+import type { ScmTab } from "../../store/filterStore";
 import CoverageNotice, { type CoverageNoticeItem } from "../common/CoverageNotice";
 import KpiCard from "../common/KpiCard";
 
 export default function ScmOverview() {
-  const { fromDate, toDate, warehouseId, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, warehouseId, itemId, channelStoreId, setActiveScmTab } = useFilterStore();
+
+  const goTo = (tab: ScmTab) => () => setActiveScmTab(tab);
 
   const inventory = useInventoryOnhand({ from_date: fromDate, to_date: toDate, warehouse_id: warehouseId, item_id: itemId });
   const stockout = useStockoutRisk({ from_date: fromDate, to_date: toDate, warehouse_id: warehouseId, item_id: itemId });
@@ -130,10 +133,10 @@ export default function ScmOverview() {
             <h3 className="mt-2 text-lg font-semibold text-gray-900">지금 바로 봐야 하는 공급망 숫자</h3>
           </div>
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-            <KpiCard title="판매 가능 재고" value={summary.totalSellable} unit="EA" coverageFlag={inventory.data?.meta.coverage_flag ?? null} />
-            <KpiCard title="품절·주의 SKU" value={summary.riskySkuCount} unit="건" coverageFlag={stockout.data?.meta.coverage_flag ?? null} />
-            <KpiCard title="미입고 수량" value={summary.openPoQty} unit="EA" />
-            <KpiCard title="반품률" value={summary.returnRate !== null ? `${summary.returnRate.toFixed(1)}%` : null} />
+            <KpiCard title="판매 가능 재고" value={summary.totalSellable} unit="EA" coverageFlag={inventory.data?.meta.coverage_flag ?? null} onClick={goTo("onhand")} linkLabel="재고 현황" />
+            <KpiCard title="품절·주의 SKU" value={summary.riskySkuCount} unit="건" coverageFlag={stockout.data?.meta.coverage_flag ?? null} onClick={goTo("stockout")} linkLabel="품절 위험" />
+            <KpiCard title="미입고 수량" value={summary.openPoQty} unit="EA" onClick={goTo("open-po")} linkLabel="미입고 발주" />
+            <KpiCard title="반품률" value={summary.returnRate !== null ? `${summary.returnRate.toFixed(1)}%` : null} onClick={goTo("shipment-return")} linkLabel="출고/반품" />
           </div>
         </div>
 
@@ -143,10 +146,10 @@ export default function ScmOverview() {
             <h3 className="mt-2 text-lg font-semibold text-gray-900">실무자가 함께 보는 참고 수치</h3>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <KpiCard title="보류 재고" value={summary.totalBlocked} unit="EA" />
-            <KpiCard title="지연 발주" value={summary.delayedPoCount} unit="건" />
-            <KpiCard title="일평균 출고" value={summary.avgDailyShipment !== null ? summary.avgDailyShipment.toFixed(1) : null} unit="EA" />
-            <KpiCard title="임계치 이하" value={summary.belowThresholdCount} unit="건" />
+            <KpiCard title="보류 재고" value={summary.totalBlocked} unit="EA" onClick={goTo("onhand")} linkLabel="재고 현황" />
+            <KpiCard title="지연 발주" value={summary.delayedPoCount} unit="건" onClick={goTo("open-po")} linkLabel="미입고 발주" />
+            <KpiCard title="일평균 출고" value={summary.avgDailyShipment !== null ? summary.avgDailyShipment.toFixed(1) : null} unit="EA" onClick={goTo("shipment-return")} linkLabel="출고/반품" />
+            <KpiCard title="임계치 이하" value={summary.belowThresholdCount} unit="건" onClick={goTo("stockout")} linkLabel="품절 위험" />
           </div>
           <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-3 text-sm text-gray-600">
             조회기간 동안 출고 {summary.shipmentCount.toLocaleString()}건 기준으로 커버리지 임계치 이하 품목

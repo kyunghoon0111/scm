@@ -14,11 +14,13 @@ export interface InventoryOnhandRow {
 }
 
 export interface TurnoverRow {
+  period: string;
   item_id: string;
   warehouse_id: string;
-  total_shipped: number;
-  avg_onhand: number;
+  avg_inventory: number;
+  cogs_or_shipment: number;
   turnover_ratio: number | null;
+  days_on_hand: number | null;
 }
 
 export interface StockoutRiskRow {
@@ -253,6 +255,19 @@ export interface ReplenishmentPlanRow {
   recommended_order_qty: number | null;
   urgency: string | null;
   forecast_method: string | null;
+}
+
+export interface AnomalySignalRow {
+  signal_id: number;
+  metric_name: string;
+  entity_type: string;
+  entity_id: string;
+  period: string | null;
+  current_value: number | null;
+  expected_value: number | null;
+  deviation: number | null;
+  severity: string;
+  detected_at: string;
 }
 
 export interface LeadTimePredictionRow {

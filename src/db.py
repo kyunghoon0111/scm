@@ -902,6 +902,17 @@ MART_TABLES = {
             capitalizable_flag BOOLEAN
         )
     """,
+    "mart.mart_inventory_turnover": """
+        CREATE TABLE IF NOT EXISTS mart.mart_inventory_turnover (
+            period VARCHAR,
+            item_id VARCHAR,
+            warehouse_id VARCHAR,
+            avg_inventory DOUBLE,
+            cogs_or_shipment DOUBLE,
+            turnover_ratio DOUBLE,
+            days_on_hand DOUBLE
+        )
+    """,
 }
 
 # ================================================================

@@ -1,7 +1,9 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy } from "react";
 import ErrorBoundary from "../components/common/ErrorBoundary";
 import GlobalFilter from "../components/common/GlobalFilter";
+import AnomalyBanner from "../components/common/AnomalyBanner";
 import ScmOverview from "../components/scm/ScmOverview";
+import { useFilterStore, type ScmTab } from "../store/filterStore";
 
 const InventoryOnhand = lazy(() => import("../components/scm/InventoryOnhand"));
 const StockoutRisk = lazy(() => import("../components/scm/StockoutRisk"));
@@ -9,6 +11,7 @@ const OpenPO = lazy(() => import("../components/scm/OpenPO"));
 const LeadTime = lazy(() => import("../components/scm/LeadTime"));
 const ShipmentReturn = lazy(() => import("../components/scm/ShipmentReturn"));
 const ConstraintOverview = lazy(() => import("../components/scm/ConstraintOverview"));
+const InventoryTurnover = lazy(() => import("../components/scm/InventoryTurnover"));
 const ForecastOverview = lazy(() => import("../components/scm/ForecastOverview"));
 
 interface Tab {
@@ -18,6 +21,7 @@ interface Tab {
 
 const TABS: Tab[] = [
   { key: "onhand", label: "재고 현황" },
+  { key: "turnover", label: "재고회전율" },
   { key: "stockout", label: "품절 위험" },
   { key: "open-po", label: "미입고 발주" },
   { key: "lead-time", label: "리드타임" },
@@ -30,6 +34,8 @@ function renderTabContent(tab: string) {
   switch (tab) {
     case "onhand":
       return <InventoryOnhand />;
+    case "turnover":
+      return <InventoryTurnover />;
     case "stockout":
       return <StockoutRisk />;
     case "open-po":
@@ -52,7 +58,8 @@ function TabLoading() {
 }
 
 export default function SCMDashboard() {
-  const [activeTab, setActiveTab] = useState("onhand");
+  const activeTab = useFilterStore((s) => s.activeScmTab);
+  const setActiveTab = useFilterStore((s) => s.setActiveScmTab);
 
   return (
     <div className="space-y-5">
@@ -70,6 +77,8 @@ export default function SCMDashboard() {
 
       <GlobalFilter />
 
+      <AnomalyBanner currentDashboard="scm" />
+
       <ErrorBoundary>
         <ScmOverview />
       </ErrorBoundary>
@@ -77,7 +86,7 @@ export default function SCMDashboard() {
       <div className="md:hidden">
         <select
           value={activeTab}
-          onChange={(event) => setActiveTab(event.target.value)}
+          onChange={(event) => setActiveTab(event.target.value as ScmTab)}
           className="filter-control w-full"
         >
           {TABS.map((tab) => (
@@ -93,7 +102,7 @@ export default function SCMDashboard() {
           {TABS.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => setActiveTab(tab.key as ScmTab)}
               className={`dashboard-tab whitespace-nowrap ${activeTab === tab.key ? "dashboard-tab-active" : ""}`}
             >
               {tab.label}

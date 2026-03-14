@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { useContribution } from "../../api/pnlApi";
 import { useFilterStore } from "../../store/filterStore";
 import type { ContributionRow } from "../../types/pnl";
+import { exportToExcel, buildExportFileName } from "../../lib/export";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
 import ErrorState from "../common/ErrorState";
@@ -10,7 +11,7 @@ import KpiCard from "../common/KpiCard";
 import { fmtKrw } from "../../lib/format";
 
 export default function Contribution() {
-  const { fromDate, toDate, itemId, channelStoreId } = useFilterStore();
+  const { fromDate, toDate, itemId, channelStoreId, drillDown } = useFilterStore();
   const { data: resp, isLoading, error } = useContribution({
     from_date: fromDate,
     to_date: toDate,
@@ -112,7 +113,32 @@ export default function Contribution() {
             <h3 className="text-sm font-semibold text-gray-800">공헌이익 상세</h3>
             <p className="text-xs text-gray-500">상품과 채널별 수익 기여도를 바로 비교할 수 있습니다.</p>
           </div>
-          {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+          <div className="flex items-center gap-2">
+            {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() =>
+                exportToExcel(
+                  rows.map((row) => ({
+                    기준월: row.period,
+                    상품: row.item_id,
+                    채널: row.channel_store_id,
+                    국가: row.country,
+                    매출총이익: row.gross_margin_krw,
+                    변동비: row.total_variable_cost_krw,
+                    공헌이익: row.contribution_krw,
+                    공헌율: row.contribution_pct !== null ? row.contribution_pct : null,
+                    커버리지: row.coverage_flag,
+                  })),
+                  buildExportFileName("공헌이익", { fromDate, toDate, itemId, channelStoreId }),
+                  "공헌이익",
+                )
+              }
+            >
+              다운로드
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -131,7 +157,12 @@ export default function Contribution() {
             </thead>
             <tbody>
               {rows.map((row, index) => (
-                <tr key={`${row.period}-${row.item_id}-${row.channel_store_id}-${index}`} className="border-t border-gray-100 hover:bg-gray-50">
+                <tr
+                  key={`${row.period}-${row.item_id}-${row.channel_store_id}-${index}`}
+                  className="border-t border-gray-100 cursor-pointer hover:bg-blue-50"
+                  onClick={() => drillDown({ itemId: row.item_id, channelStoreId: row.channel_store_id, pnlTab: "operating-profit" })}
+                  title={`${row.item_id} 영업이익 보기`}
+                >
                   <td className="px-4 py-2">{row.period}</td>
                   <td className="px-4 py-2 font-mono text-xs">{row.item_id}</td>
                   <td className="px-4 py-2">{row.channel_store_id}</td>

@@ -12,6 +12,7 @@ import {
 import { useInventoryOnhand } from "../../api/scmApi";
 import { useFilterStore } from "../../store/filterStore";
 import type { InventoryOnhandRow } from "../../types/scm";
+import { exportToExcel, buildExportFileName } from "../../lib/export";
 import CoverageBadge from "../common/CoverageBadge";
 import EmptyState from "../common/EmptyState";
 import ErrorState from "../common/ErrorState";
@@ -62,7 +63,7 @@ function buildSummary(rows: InventoryOnhandRow[]): SummaryRow[] {
 }
 
 export default function InventoryOnhand() {
-  const { fromDate, toDate, warehouseId, itemId } = useFilterStore();
+  const { fromDate, toDate, warehouseId, itemId, drillDown } = useFilterStore();
   const { data: resp, isLoading, error } = useInventoryOnhand({
     from_date: fromDate,
     to_date: toDate,
@@ -159,7 +160,31 @@ export default function InventoryOnhand() {
             <h3 className="text-sm font-semibold text-gray-800">상품 요약</h3>
             <p className="text-xs text-gray-500">lot 단위 데이터를 상품 기준으로 합산한 결과입니다.</p>
           </div>
-          {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+          <div className="flex items-center gap-2">
+            {meta?.coverage_flag && <CoverageBadge flag={meta.coverage_flag} />}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              onClick={() =>
+                exportToExcel(
+                  summaryRows.map((row) => ({
+                    기준일: row.snapshot_date,
+                    창고: row.warehouse_id,
+                    상품: row.item_id,
+                    "로트 수": row.lot_count,
+                    "총 재고": row.onhand_qty,
+                    "판매 가능": row.sellable_qty,
+                    보류: row.blocked_qty,
+                    "기한 경과": row.expired_qty,
+                  })),
+                  buildExportFileName("재고현황", { fromDate, toDate, warehouseId, itemId }),
+                  "재고현황",
+                )
+              }
+            >
+              다운로드
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -179,7 +204,9 @@ export default function InventoryOnhand() {
               {summaryRows.map((row) => (
                 <tr
                   key={`${row.snapshot_date}-${row.warehouse_id}-${row.item_id}`}
-                  className="border-t border-gray-100 hover:bg-gray-50"
+                  className="border-t border-gray-100 cursor-pointer hover:bg-blue-50"
+                  onClick={() => drillDown({ itemId: row.item_id, warehouseId: row.warehouse_id, scmTab: "stockout" })}
+                  title={`${row.item_id} 품절 위험 보기`}
                 >
                   <td className="px-4 py-2 text-xs">{row.snapshot_date}</td>
                   <td className="px-4 py-2">{row.warehouse_id}</td>

@@ -1,7 +1,9 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy } from "react";
 import ErrorBoundary from "../components/common/ErrorBoundary";
 import GlobalFilter from "../components/common/GlobalFilter";
+import AnomalyBanner from "../components/common/AnomalyBanner";
 import PnlOverview from "../components/pnl/PnlOverview";
+import { useFilterStore, type PnlTab } from "../store/filterStore";
 
 const Revenue = lazy(() => import("../components/pnl/Revenue"));
 const COGS = lazy(() => import("../components/pnl/COGS"));
@@ -48,7 +50,8 @@ function TabLoading() {
 }
 
 export default function PNLDashboard() {
-  const [activeTab, setActiveTab] = useState("revenue");
+  const activeTab = useFilterStore((s) => s.activePnlTab);
+  const setActiveTab = useFilterStore((s) => s.setActivePnlTab);
 
   return (
     <div className="space-y-5">
@@ -66,6 +69,8 @@ export default function PNLDashboard() {
 
       <GlobalFilter />
 
+      <AnomalyBanner currentDashboard="pnl" />
+
       <ErrorBoundary>
         <PnlOverview />
       </ErrorBoundary>
@@ -73,7 +78,7 @@ export default function PNLDashboard() {
       <div className="md:hidden">
         <select
           value={activeTab}
-          onChange={(event) => setActiveTab(event.target.value)}
+          onChange={(event) => setActiveTab(event.target.value as PnlTab)}
           className="filter-control w-full"
         >
           {TABS.map((tab) => (
@@ -89,7 +94,7 @@ export default function PNLDashboard() {
           {TABS.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => setActiveTab(tab.key as PnlTab)}
               className={`dashboard-tab whitespace-nowrap ${activeTab === tab.key ? "dashboard-tab-active" : ""}`}
             >
               {tab.label}

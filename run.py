@@ -115,6 +115,7 @@ def run_pipeline(con, config: AppConfig, dry_run: bool = False) -> None:
     from src.mart_constraint import build_all_constraint_marts
     from src.allocation import allocate_all_charges
     from src.coverage import compute_coverage
+    from src.anomaly import detect_all_anomalies
 
     batch_id = acquire_lock(con)
     logger.info(f"Pipeline started. Batch ID: {batch_id}, dry_run={dry_run}")
@@ -160,6 +161,11 @@ def run_pipeline(con, config: AppConfig, dry_run: bool = False) -> None:
         # 7. Compute coverage
         logger.info("=== PHASE 7: Coverage Reporting ===")
         compute_coverage(con, config)
+
+        # 8. Anomaly detection
+        logger.info("=== PHASE 8: Anomaly Detection ===")
+        anomaly_count = detect_all_anomalies(con, config)
+        logger.info(f"Anomaly detection complete: {anomaly_count} signals")
 
         if dry_run:
             logger.info("Dry run complete. Results NOT persisted (no rollback needed for read-based marts).")

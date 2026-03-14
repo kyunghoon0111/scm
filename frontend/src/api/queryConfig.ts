@@ -22,6 +22,9 @@ export const QUERY_CONFIG = {
   // 대사검증 (5분)
   reco: { staleTime: 5 * 60 * 1000 },
 
+  // 이상치 신호 (2분)
+  anomaly: { staleTime: 2 * 60 * 1000 },
+
   // 관리자 (1분)
   admin: { staleTime: 60 * 1000 },
 } as const;
