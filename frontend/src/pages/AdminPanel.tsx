@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { fetchJob, fetchRecentJobs, type BackendJobDetail, type BackendJobSummary } from "../api/backendApi";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { fetchJob, fetchRecentJobs, startFinalizeJob, type BackendJobDetail, type BackendJobSummary } from "../api/backendApi";
+
+type JobFilter = "all" | "running" | "failed" | "success";
 
 function statusTone(status: string | undefined) {
   switch (status) {
@@ -38,6 +40,24 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString("ko-KR");
 }
 
+function formatDuration(startedAt?: string | null, finishedAt?: string | null) {
+  if (!startedAt) return "-";
+  const start = new Date(startedAt).getTime();
+  const end = finishedAt ? new Date(finishedAt).getTime() : Date.now();
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return "-";
+
+  const seconds = Math.floor((end - start) / 1000);
+  if (seconds < 60) return `${seconds}초`;
+
+  const minutes = Math.floor(seconds / 60);
+  const remainSeconds = seconds % 60;
+  if (minutes < 60) return `${minutes}분 ${remainSeconds}초`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainMinutes = minutes % 60;
+  return `${hours}시간 ${remainMinutes}분`;
+}
+
 function getCurrentStep(job?: BackendJobDetail | null) {
   const detail = job?.detail;
   if (!detail || typeof detail !== "object") return "-";
@@ -54,6 +74,8 @@ function getSteps(job?: BackendJobDetail | null) {
 
 export default function AdminPanel() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<JobFilter>("all");
+  const [message, setMessage] = useState<string | null>(null);
 
   const jobsQuery = useQuery({
     queryKey: ["admin", "jobs"],
@@ -61,13 +83,39 @@ export default function AdminPanel() {
     refetchInterval: 5000,
   });
 
-  useEffect(() => {
-    if (!selectedJobId && jobsQuery.data?.items?.[0]?.job_id) {
-      setSelectedJobId(jobsQuery.data.items[0].job_id);
-    }
-  }, [jobsQuery.data, selectedJobId]);
+  const rerunMutation = useMutation({
+    mutationFn: startFinalizeJob,
+    onSuccess: async (created) => {
+      setMessage("후처리 작업을 다시 시작했습니다.");
+      setSelectedJobId(created.job_id);
+      await jobsQuery.refetch();
+    },
+    onError: (error) => {
+      setMessage(error instanceof Error ? error.message : "후처리 재실행 중 오류가 발생했습니다.");
+    },
+  });
 
-  const selectedJobSummary = jobsQuery.data?.items.find((job) => job.job_id === selectedJobId) ?? null;
+  const filteredJobs = useMemo(() => {
+    const items = jobsQuery.data?.items ?? [];
+    switch (filter) {
+      case "running":
+        return items.filter((job) => job.status === "running" || job.status === "queued");
+      case "failed":
+        return items.filter((job) => job.status === "failed");
+      case "success":
+        return items.filter((job) => job.status === "success");
+      default:
+        return items;
+    }
+  }, [filter, jobsQuery.data?.items]);
+
+  useEffect(() => {
+    if (!selectedJobId && filteredJobs[0]?.job_id) {
+      setSelectedJobId(filteredJobs[0].job_id);
+    }
+  }, [filteredJobs, selectedJobId]);
+
+  const selectedJobSummary = (jobsQuery.data?.items ?? []).find((job) => job.job_id === selectedJobId) ?? null;
 
   const jobDetailQuery = useQuery({
     queryKey: ["admin", "job", selectedJobId],
@@ -79,9 +127,10 @@ export default function AdminPanel() {
     },
   });
 
-  const runningCount = (jobsQuery.data?.items ?? []).filter((job) => job.status === "running" || job.status === "queued").length;
-  const failedCount = (jobsQuery.data?.items ?? []).filter((job) => job.status === "failed").length;
-  const successCount = (jobsQuery.data?.items ?? []).filter((job) => job.status === "success").length;
+  const allJobs = jobsQuery.data?.items ?? [];
+  const runningCount = allJobs.filter((job) => job.status === "running" || job.status === "queued").length;
+  const failedCount = allJobs.filter((job) => job.status === "failed").length;
+  const successCount = allJobs.filter((job) => job.status === "success").length;
 
   return (
     <div className="space-y-6">
@@ -90,7 +139,7 @@ export default function AdminPanel() {
         <div className="relative z-10 mt-3 max-w-3xl">
           <h1 className="text-3xl font-semibold tracking-tight text-gray-900 md:text-4xl">업로드와 후처리 상태를 한 화면에서 관리합니다.</h1>
           <p className="mt-3 text-sm leading-6 text-gray-600 md:text-base">
-            최근 배치 이력, 현재 실행 단계, 실패 메시지를 확인하고 어느 단계에서 막혔는지 바로 추적할 수 있습니다.
+            최근 배치 이력, 현재 실행 단계, 실패 메시지를 확인하고 필요하면 즉시 후처리를 다시 실행할 수 있습니다.
           </p>
         </div>
       </div>
@@ -112,21 +161,56 @@ export default function AdminPanel() {
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <section className="panel-card space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <h2 className="text-base font-semibold text-gray-900">최근 작업</h2>
               <p className="mt-1 text-sm text-gray-500">최근 업로드 후처리 작업과 상태를 확인합니다.</p>
             </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFilter("all")}
+                className={`rounded-xl px-3 py-2 text-sm transition ${filter === "all" ? "bg-gray-900 text-white" : "border border-black/10 bg-white text-gray-600 hover:border-orange-300 hover:text-gray-900"}`}
+              >
+                전체
+              </button>
+              <button
+                onClick={() => setFilter("running")}
+                className={`rounded-xl px-3 py-2 text-sm transition ${filter === "running" ? "bg-gray-900 text-white" : "border border-black/10 bg-white text-gray-600 hover:border-orange-300 hover:text-gray-900"}`}
+              >
+                실행 중
+              </button>
+              <button
+                onClick={() => setFilter("failed")}
+                className={`rounded-xl px-3 py-2 text-sm transition ${filter === "failed" ? "bg-gray-900 text-white" : "border border-black/10 bg-white text-gray-600 hover:border-orange-300 hover:text-gray-900"}`}
+              >
+                실패
+              </button>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
             <button
               onClick={() => void jobsQuery.refetch()}
               className="rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-gray-600 transition hover:border-orange-300 hover:text-gray-900"
             >
               새로고침
             </button>
+            <button
+              onClick={() => {
+                setMessage(null);
+                void rerunMutation.mutateAsync();
+              }}
+              disabled={rerunMutation.isPending}
+              className="rounded-xl bg-orange-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-orange-500 disabled:bg-orange-300"
+            >
+              {rerunMutation.isPending ? "재실행 중..." : "후처리 다시 실행"}
+            </button>
           </div>
 
+          {message ? <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-3 text-sm text-gray-700">{message}</div> : null}
+
           <div className="space-y-3">
-            {(jobsQuery.data?.items ?? []).map((job: BackendJobSummary) => {
+            {filteredJobs.map((job: BackendJobSummary) => {
               const isActive = job.job_id === selectedJobId;
               return (
                 <button
@@ -148,6 +232,8 @@ export default function AdminPanel() {
                   <div className="mt-3 grid gap-2 text-xs text-gray-500 sm:grid-cols-2">
                     <p>시작: {formatDate(job.started_at)}</p>
                     <p>종료: {formatDate(job.finished_at)}</p>
+                    <p>소요: {formatDuration(job.started_at, job.finished_at)}</p>
+                    <p>트리거: {job.trigger_source ?? "-"}</p>
                   </div>
                   {job.error_msg ? <p className="mt-3 text-sm text-amber-700">{job.error_msg}</p> : null}
                 </button>
@@ -155,8 +241,8 @@ export default function AdminPanel() {
             })}
 
             {jobsQuery.isLoading && <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-6 text-sm text-gray-500">작업 목록을 불러오는 중입니다.</div>}
-            {!jobsQuery.isLoading && (jobsQuery.data?.items?.length ?? 0) === 0 && (
-              <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-6 text-sm text-gray-500">표시할 작업 이력이 없습니다.</div>
+            {!jobsQuery.isLoading && filteredJobs.length === 0 && (
+              <div className="rounded-2xl border border-black/5 bg-stone-50 px-4 py-6 text-sm text-gray-500">조건에 맞는 작업 이력이 없습니다.</div>
             )}
           </div>
         </section>
@@ -183,6 +269,7 @@ export default function AdminPanel() {
                 <p>종료: {formatDate(jobDetailQuery.data?.finished_at ?? selectedJobSummary.finished_at)}</p>
                 <p>현재 단계: {getCurrentStep(jobDetailQuery.data)}</p>
                 <p>트리거: {jobDetailQuery.data?.trigger_source ?? selectedJobSummary.trigger_source ?? "-"}</p>
+                <p>소요 시간: {formatDuration(jobDetailQuery.data?.started_at ?? selectedJobSummary.started_at, jobDetailQuery.data?.finished_at ?? selectedJobSummary.finished_at)}</p>
               </div>
               {(jobDetailQuery.data?.error_msg ?? selectedJobSummary.error_msg) ? (
                 <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-amber-800">

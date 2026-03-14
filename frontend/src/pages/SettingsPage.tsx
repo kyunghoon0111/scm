@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { COLUMN_LABELS, TABLE_LABELS, UPLOAD_DATASETS, useColumnMappings, useSaveColumnMappings, type ColumnMapping } from "../api/uploadApi";
 
 type EditableMapping = {
@@ -20,6 +20,7 @@ export default function SettingsPage() {
   const saveMappings = useSaveColumnMappings();
   const [rows, setRows] = useState<EditableMapping[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     setRows(
@@ -30,6 +31,13 @@ export default function SettingsPage() {
       })),
     );
   }, [mappings]);
+
+  const filteredCanonicalColumns = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    const entries = Object.entries(COLUMN_LABELS);
+    if (!keyword) return entries;
+    return entries.filter(([key, label]) => key.toLowerCase().includes(keyword) || label.toLowerCase().includes(keyword));
+  }, [search]);
 
   function updateRow(index: number, field: keyof EditableMapping, value: string) {
     setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)));
@@ -166,6 +174,30 @@ export default function SettingsPage() {
               )}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section className="panel-card space-y-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Canonical 컬럼 레퍼런스</h2>
+            <p className="mt-1 text-sm text-gray-500">현재 파서가 이해하는 컬럼 이름과 의미를 빠르게 확인합니다.</p>
+          </div>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-orange-300 md:max-w-xs"
+            placeholder="컬럼명 또는 한글명 검색"
+          />
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {filteredCanonicalColumns.map(([key, label]) => (
+            <div key={key} className="rounded-2xl border border-black/5 bg-white px-4 py-4">
+              <p className="text-sm font-semibold text-gray-900">{key}</p>
+              <p className="mt-1 text-xs text-gray-500">{label}</p>
+            </div>
+          ))}
         </div>
       </section>
 
