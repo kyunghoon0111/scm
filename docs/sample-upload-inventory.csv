@@ -1,6 +1,6 @@
-snapshot_date,warehouse_id,item_id,lot_id,onhand_qty,sellable_qty,blocked_qty,expiry_date,qc_status,hold_flag,source_system
-2026-03-14,WH-SEOUL-01,ITEM-001,LOT-A01,120,118,2,2027-12-31,released,false,upload_ui
-2026-03-14,WH-SEOUL-01,ITEM-002,LOT-B01,80,80,0,2027-09-30,released,false,upload_ui
-2026-03-14,WH-BUSAN-01,ITEM-003,LOT-C01,65,60,5,2027-08-31,released,false,upload_ui
-2026-03-14,WH-SEOUL-01,ITEM-004,LOT-D01,95,95,0,2028-01-15,released,false,upload_ui
-2026-03-14,WH-SEOUL-01,ITEM-005,LOT-E01,150,145,5,2027-06-30,released,false,upload_ui
+snapshot_date,warehouse_id,item_id,lot_id,onhand_qty,sellable_qty,blocked_qty,expiry_date,qc_status,hold_flag,owner_id,inventory_status,channel_store_id,reserved_qty,damaged_qty,in_transit_qty,safety_stock_qty,unit_cost,country,source_updated_at,source_system
+2026-03-14,WH-SEOUL-01,ITEM-001,LOT-A01,120,118,2,2027-12-31,released,false,OWN-SEOUL,available,STORE-001,8,0,12,40,5200,KR,2026-03-14T09:00:00,upload_ui
+2026-03-14,WH-SEOUL-01,ITEM-002,LOT-B01,80,80,0,2027-09-30,released,false,OWN-SEOUL,available,STORE-001,5,0,0,30,4100,KR,2026-03-14T09:05:00,upload_ui
+2026-03-14,WH-BUSAN-01,ITEM-003,LOT-C01,65,60,5,2027-08-31,released,false,OWN-BUSAN,hold,STORE-002,4,1,6,25,4700,KR,2026-03-14T09:10:00,upload_ui
+2026-03-14,WH-SEOUL-01,ITEM-004,LOT-D01,95,95,0,2028-01-15,released,false,OWN-SEOUL,available,STORE-001,7,0,10,35,6100,KR,2026-03-14T09:15:00,upload_ui
+2026-03-14,WH-SEOUL-01,ITEM-005,LOT-E01,150,145,5,2027-06-30,released,false,OWN-SEOUL,available,STORE-003,10,0,8,50,3300,KR,2026-03-14T09:20:00,upload_ui

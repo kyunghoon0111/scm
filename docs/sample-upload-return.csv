@@ -1,4 +1,4 @@
-return_id,return_date,warehouse_id,item_id,qty_returned,lot_id,channel_order_id,reason,disposition,source_system
-RET-20260313-001,2026-03-13,WH-SEOUL-01,ITEM-001,2,LOT-A01,ORD-20260310-001,DAMAGED,discard,upload_ui
-RET-20260313-002,2026-03-13,WH-SEOUL-01,ITEM-002,1,LOT-B01,ORD-20260310-002,CUSTOMER_CHANGE,restock,upload_ui
-RET-20260314-001,2026-03-14,WH-BUSAN-01,ITEM-003,1,LOT-C01,ORD-20260311-001,DAMAGED,discard,upload_ui
+return_id,return_date,warehouse_id,item_id,qty_returned,return_line_id,lot_id,channel_order_id,channel_store_id,order_id,order_line_id,reason,disposition,refund_amount,return_shipping_fee,return_reason_code,return_quality_grade,resellable_flag,source_updated_at,source_system
+RET-20260313-001,2026-03-13,WH-SEOUL-01,ITEM-001,2,1,LOT-A01,ORD-20260310-001,STORE-001,ORD-20260310-001,1,DAMAGED,discard,32000,3000,DAMAGE_A,B,false,2026-03-13T18:00:00,upload_ui
+RET-20260313-002,2026-03-13,WH-SEOUL-01,ITEM-002,1,1,LOT-B01,ORD-20260310-002,STORE-001,ORD-20260310-002,1,CUSTOMER_CHANGE,restock,16000,3000,CHANGE_C,A,true,2026-03-13T18:10:00,upload_ui
+RET-20260314-001,2026-03-14,WH-BUSAN-01,ITEM-003,1,1,LOT-C01,ORD-20260311-001,STORE-002,ORD-20260311-001,1,DAMAGED,discard,15000,3400,DAMAGE_A,C,false,2026-03-14T18:20:00,upload_ui

@@ -1,5 +1,5 @@
-invoice_no,invoice_line_no,charge_type,amount,currency,period,invoice_date,vendor_partner_id,channel_store_id,warehouse_id,country,charge_basis,source_system
-INV-20260314-001,1,LAST_MILE_PARCEL,15000,KRW,2026-03,2026-03-14,VENDOR-001,STORE-001,WH-SEOUL-01,KR,order_count,upload_ui
-INV-20260314-001,2,DOMESTIC_TRUCKING,12000,KRW,2026-03,2026-03-14,VENDOR-001,STORE-001,WH-SEOUL-01,KR,weight,upload_ui
-INV-20260314-002,1,3PL_STORAGE_FEE,18000,KRW,2026-03,2026-03-14,VENDOR-001,STORE-001,WH-SEOUL-01,KR,onhand_cbm_days,upload_ui
-INV-20260314-003,1,PLATFORM_FEE,22000,KRW,2026-03,2026-03-14,VENDOR-001,STORE-001,WH-SEOUL-01,KR,revenue,upload_ui
+invoice_no,invoice_line_no,charge_type,amount,currency,period,invoice_date,vendor_partner_id,supplier_id,charge_basis,reference_type,reference_id,charge_category,cost_center,channel_store_id,item_id,warehouse_id,country,allocation_key,allocation_basis_value,tax_amount,invoice_status,reference_period,accrual_flag,source_updated_at,source_system
+INV-20260314-001,1,LAST_MILE_PARCEL,15000,KRW,2026-03,2026-03-14,VENDOR-001,SUP-001,order_count,shipment,ORD-20260310-001,logistics,delivery,STORE-001,ITEM-001,WH-SEOUL-01,KR,channel_store_id,20,1500,approved,2026-03,true,2026-03-14T19:00:00,upload_ui
+INV-20260314-001,2,DOMESTIC_TRUCKING,12000,KRW,2026-03,2026-03-14,VENDOR-001,SUP-001,weight,shipment,ORD-20260310-002,logistics,inbound,STORE-001,ITEM-002,WH-SEOUL-01,KR,warehouse_id,2.5,1200,approved,2026-03,true,2026-03-14T19:05:00,upload_ui
+INV-20260314-002,1,3PL_STORAGE_FEE,18000,KRW,2026-03,2026-03-14,VENDOR-001,SUP-001,onhand_cbm_days,inventory,WH-SEOUL-01,fulfillment,storage,STORE-001,ITEM-004,WH-SEOUL-01,KR,item_id,95,1800,approved,2026-03,true,2026-03-14T19:10:00,upload_ui
+INV-20260314-003,1,PLATFORM_FEE,22000,KRW,2026-03,2026-03-14,VENDOR-001,SUP-001,revenue,settlement,STL-202603-001,sales,platform,STORE-001,ITEM-001,WH-SEOUL-01,KR,channel_store_id,320000,2200,approved,2026-03,true,2026-03-14T19:15:00,upload_ui

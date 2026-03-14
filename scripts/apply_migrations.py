@@ -29,6 +29,7 @@ MIGRATIONS = [
     "migrations/10_views.sql",
     "migrations/11_upload_contracts.sql",
     "migrations/12_backend_job_log.sql",
+    "migrations/13_phase2_upload_contracts.sql",
 ]
 
 
