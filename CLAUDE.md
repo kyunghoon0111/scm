@@ -13,7 +13,7 @@
 ## 프로젝트 한 줄 요약
 
 이 프로젝트는 재고와 손익 정보를 보여주는 대시보드입니다.
-지금 우선순위는 새 기능 추가가 아니라, 이미 있는 Phase 1 화면을 안정적으로 유지하는 것입니다.
+Phase 1 완료. 다음은 Phase 1.5 안정화 (엑셀 다운로드, 필터, 페이지네이션 등).
 
 ## 지금 실제로 보는 화면
 
@@ -42,8 +42,7 @@
 - `docs/upload-template-guide.md`: 업로드 파일 형식 기준
 - `docs/upload-status-flow.md`: 업로드 상태 흐름
 - `docs/raw-to-core-mapping.md`: 원본 데이터를 정리하는 기준
-- `docs/project-principles.md`: 프로젝트 운영 원칙
-- `docs/future-plan.md`: 나중에 확장할 아이디어
+- `docs/future-plan.md`: 전체 로드맵 (Phase 1.5~5)
 
 ## 운영 반영에 쓰는 스크립트
 
@@ -51,6 +50,10 @@
 - `scripts/verify_supabase_access.py`
 - `scripts/update_status.py`
 
-## 지금 가장 중요한 남은 일
+## 세션 가이드
 
-운영 Supabase에 최신 마이그레이션을 반영하고, 익명 사용자가 내부 데이터에 접근하지 못하는지 다시 확인하는 것입니다.
+- `docs/phase1.5-session-guide.md`: 안정화 (5세션)
+- `docs/phase2-session-guide.md`: 데이터 심화 (5~6세션)
+- `docs/phase3-session-guide.md`: 운영 관리 UI (4세션)
+- `docs/phase4-session-guide.md`: 분석 고도화 (4~5세션)
+- `docs/phase5-session-guide.md`: 자동화/알림 (4~5세션)
