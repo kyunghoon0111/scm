@@ -4,7 +4,7 @@ interface KpiCardProps {
   title: string;
   value: number | string | null | undefined;
   unit?: string;
-  coverageFlag?: "ACTUAL" | "PARTIAL" | null;
+  coverageFlag?: "ACTUAL" | "PARTIAL" | "NO_DATA" | null;
 }
 
 function formatValue(value: number | string | null | undefined): string {

@@ -133,7 +133,7 @@ export default function UploadPage() {
           errors.push("동일한 데이터 해시의 업로드가 이미 있어 이번 적재는 건너뛰었습니다.");
         }
         if (backendItem?.error) {
-          errors.push(backendItem.error);
+          errors.push(...backendItem.error.split("\n").filter(Boolean));
         }
 
         return {

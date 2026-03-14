@@ -416,6 +416,124 @@ def build_upload_hash(table_name: str, rows: list[dict[str, Any]], ordered_colum
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _to_float(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _month_prefix(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text[:7] if len(text) >= 7 else None
+
+
+def validate_upload_rows(table_name: str, file_name: str, rows: list[dict[str, Any]]) -> list[str]:
+    errors: list[str] = []
+    seen_keys: set[tuple[Any, ...]] = set()
+    key_columns_map: dict[str, list[str]] = {
+        "upload_inventory_snapshot": ["snapshot_date", "warehouse_id", "item_id", "lot_id"],
+        "upload_purchase_order": ["po_id", "item_id"],
+        "upload_receipt": ["receipt_id", "item_id"],
+        "upload_shipment": ["shipment_id", "item_id", "lot_id"],
+        "upload_return": ["return_id", "item_id", "lot_id"],
+        "upload_sales": ["settlement_id", "line_no"],
+        "upload_charge": ["invoice_no", "invoice_line_no", "charge_type"],
+    }
+    non_negative_map: dict[str, list[str]] = {
+        "upload_inventory_snapshot": ["onhand_qty", "sellable_qty", "blocked_qty", "reserved_qty", "damaged_qty", "in_transit_qty", "safety_stock_qty", "unit_cost"],
+        "upload_purchase_order": ["qty_ordered", "unit_price", "moq_qty", "pack_size", "tax_amount"],
+        "upload_receipt": ["qty_received", "damaged_qty", "short_received_qty", "excess_received_qty"],
+        "upload_shipment": ["qty_shipped", "weight", "volume_cbm", "shipping_fee"],
+        "upload_return": ["qty_returned", "refund_amount", "return_shipping_fee"],
+        "upload_sales": ["gross_sales", "quantity_sold", "unit_selling_price", "discounts", "fees", "refunds", "net_payout", "tax_amount", "promo_cost", "platform_fee", "payment_fee", "coupon_amount"],
+        "upload_charge": ["amount", "allocation_basis_value", "tax_amount"],
+    }
+
+    key_columns = key_columns_map.get(table_name, [])
+    non_negative_columns = non_negative_map.get(table_name, [])
+
+    for index, row in enumerate(rows, start=1):
+        prefix = f"{file_name} {index}행"
+
+        if key_columns:
+            key = tuple((row.get(column) or "__NONE__") for column in key_columns)
+            if key in seen_keys:
+                errors.append(f"{prefix}: 업로드 파일 내 business key가 중복됩니다. ({', '.join(key_columns)})")
+            else:
+                seen_keys.add(key)
+
+        for column in non_negative_columns:
+            value = _to_float(row.get(column))
+            if value is not None and value < 0:
+                errors.append(f"{prefix}: {column} 값은 음수일 수 없습니다.")
+
+        if table_name == "upload_inventory_snapshot":
+            onhand = _to_float(row.get("onhand_qty"))
+            sellable = _to_float(row.get("sellable_qty"))
+            blocked = _to_float(row.get("blocked_qty"))
+            reserved = _to_float(row.get("reserved_qty"))
+            if onhand is not None and sellable is not None and sellable > onhand:
+                errors.append(f"{prefix}: sellable_qty가 onhand_qty보다 큽니다.")
+            if onhand is not None and blocked is not None and blocked > onhand:
+                errors.append(f"{prefix}: blocked_qty가 onhand_qty보다 큽니다.")
+            if onhand is not None and sellable is not None and blocked is not None and reserved is not None:
+                if sellable + blocked + reserved > onhand:
+                    errors.append(f"{prefix}: sellable_qty + blocked_qty + reserved_qty가 onhand_qty를 초과합니다.")
+
+        if table_name == "upload_purchase_order":
+            po_date = str(row.get("po_date") or "")
+            eta_date = str(row.get("eta_date") or "")
+            if po_date and eta_date and eta_date < po_date:
+                errors.append(f"{prefix}: eta_date가 po_date보다 빠릅니다.")
+
+        if table_name == "upload_receipt":
+            receipt_date = str(row.get("receipt_date") or "")
+            expiry_date = str(row.get("expiry_date") or "")
+            mfg_date = str(row.get("mfg_date") or "")
+            if mfg_date and receipt_date and mfg_date > receipt_date:
+                errors.append(f"{prefix}: mfg_date가 receipt_date보다 늦습니다.")
+            if expiry_date and mfg_date and expiry_date < mfg_date:
+                errors.append(f"{prefix}: expiry_date가 mfg_date보다 빠릅니다.")
+
+        if table_name == "upload_shipment":
+            ship_date = str(row.get("ship_date") or "")
+            promised_ship_date = str(row.get("promised_ship_date") or "")
+            delivered_at = str(row.get("delivered_at") or "")
+            if promised_ship_date and ship_date and ship_date < promised_ship_date:
+                errors.append(f"{prefix}: ship_date가 promised_ship_date보다 빠릅니다.")
+            if delivered_at and ship_date and delivered_at[:10] < ship_date:
+                errors.append(f"{prefix}: delivered_at이 ship_date보다 빠릅니다.")
+
+        if table_name == "upload_sales":
+            period = str(row.get("period") or "")
+            order_month = _month_prefix(row.get("order_date"))
+            ship_month = _month_prefix(row.get("ship_date"))
+            if period and order_month and order_month != period:
+                errors.append(f"{prefix}: order_date의 월이 period와 다릅니다.")
+            if period and ship_month and ship_month != period:
+                errors.append(f"{prefix}: ship_date의 월이 period와 다릅니다.")
+
+        if table_name == "upload_charge":
+            period = str(row.get("period") or "")
+            invoice_month = _month_prefix(row.get("invoice_date"))
+            reference_period = str(row.get("reference_period") or "")
+            if period and invoice_month and invoice_month != period:
+                errors.append(f"{prefix}: invoice_date의 월이 period와 다릅니다.")
+            if reference_period and period and reference_period > period:
+                errors.append(f"{prefix}: reference_period가 period보다 미래입니다.")
+
+        if len(errors) >= 50:
+            errors.append(f"{file_name}: 정합성 오류가 많아 일부만 표시했습니다.")
+            break
+
+    return errors
+
+
 def find_existing_upload(file_hash: str, table_name: str) -> dict[str, Any] | None:
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -689,6 +807,19 @@ def upload_raw_batches(payload: UploadBatchRequest):
 
     for item in payload.items:
         try:
+            validation_errors = validate_upload_rows(item.table_name, item.file_name, item.rows)
+            if validation_errors:
+                results.append(
+                    {
+                        "table_name": item.table_name,
+                        "file_name": item.file_name,
+                        "inserted_count": 0,
+                        "skipped_count": len(item.rows),
+                        "duplicate": False,
+                        "error": "\n".join(validation_errors[:20]),
+                    }
+                )
+                continue
             upload_result = insert_upload_rows(item.table_name, item.file_name, item.rows)
             results.append(
                 {

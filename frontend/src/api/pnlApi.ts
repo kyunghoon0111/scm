@@ -43,7 +43,7 @@ function wrap<T>(data: T[] | null, error: unknown): ApiResponse<T[]> {
       ? "ACTUAL"
       : coverageValues.length > 0
         ? "PARTIAL"
-        : null;
+        : "NO_DATA";
   return {
     success: true,
     data: rows,

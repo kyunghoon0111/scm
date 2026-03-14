@@ -1,4 +1,4 @@
-export type CoverageFlag = "ACTUAL" | "PARTIAL";
+export type CoverageFlag = "ACTUAL" | "PARTIAL" | "NO_DATA";
 
 export type Role = "admin" | "scm" | "pnl" | "ops" | "readonly";
 
