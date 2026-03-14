@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { fetchJob, startFinalizeJob, uploadRawBatches, type BackendJobDetail } from "../api/backendApi";
 import {
   buildAliasMapFromMappings,
@@ -95,6 +95,7 @@ export default function UploadPage() {
 
   const { data: mappings = [] } = useColumnMappings();
   const queryClient = useQueryClient();
+  const refreshedJobIdsRef = useRef<Set<string>>(new Set());
 
   const uploadMutation = useMutation({
     mutationFn: async ({ fileResults }: { fileResults: FileParseResult[] }): Promise<UploadResult> => {
@@ -198,6 +199,18 @@ export default function UploadPage() {
 
     return () => window.clearInterval(timer);
   }, [job]);
+
+  useEffect(() => {
+    if (!job?.job_id || job.status !== "success") return;
+    if (refreshedJobIdsRef.current.has(job.job_id)) return;
+
+    refreshedJobIdsRef.current.add(job.job_id);
+    queryClient.invalidateQueries({ queryKey: ["scm"] });
+    queryClient.invalidateQueries({ queryKey: ["pnl"] });
+    queryClient.invalidateQueries({ queryKey: ["coverage"] });
+    queryClient.invalidateQueries({ queryKey: ["reco"] });
+    queryClient.invalidateQueries({ queryKey: ["constraint"] });
+  }, [job, queryClient]);
 
   async function handleFilesSelected(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
