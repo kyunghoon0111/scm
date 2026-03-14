@@ -1,2 +1,6 @@
-snapshot_date,warehouse_id,item_id,onhand_qty,sellable_qty,blocked_qty,source_system
-2026-03-14,WH-SEOUL-01,ITEM-001,120,118,2,upload_ui
+snapshot_date,warehouse_id,item_id,lot_id,onhand_qty,sellable_qty,blocked_qty,expiry_date,qc_status,hold_flag,source_system
+2026-03-14,WH-SEOUL-01,ITEM-001,LOT-A01,120,118,2,2027-12-31,released,false,upload_ui
+2026-03-14,WH-SEOUL-01,ITEM-002,LOT-B01,80,80,0,2027-09-30,released,false,upload_ui
+2026-03-14,WH-BUSAN-01,ITEM-003,LOT-C01,65,60,5,2027-08-31,released,false,upload_ui
+2026-03-14,WH-SEOUL-01,ITEM-004,LOT-D01,95,95,0,2028-01-15,released,false,upload_ui
+2026-03-14,WH-SEOUL-01,ITEM-005,LOT-E01,150,145,5,2027-06-30,released,false,upload_ui

@@ -1,0 +1,4 @@
+return_id,return_date,warehouse_id,item_id,qty_returned,lot_id,channel_order_id,reason,disposition,source_system
+RET-20260313-001,2026-03-13,WH-SEOUL-01,ITEM-001,2,LOT-A01,ORD-20260310-001,DAMAGED,discard,upload_ui
+RET-20260313-002,2026-03-13,WH-SEOUL-01,ITEM-002,1,LOT-B01,ORD-20260310-002,CUSTOMER_CHANGE,restock,upload_ui
+RET-20260314-001,2026-03-14,WH-BUSAN-01,ITEM-003,1,LOT-C01,ORD-20260311-001,DAMAGED,discard,upload_ui

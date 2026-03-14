@@ -1,2 +1,5 @@
 invoice_no,invoice_line_no,charge_type,amount,currency,period,invoice_date,vendor_partner_id,channel_store_id,warehouse_id,country,charge_basis,source_system
 INV-20260314-001,1,LAST_MILE_PARCEL,15000,KRW,2026-03,2026-03-14,VENDOR-001,STORE-001,WH-SEOUL-01,KR,order_count,upload_ui
+INV-20260314-001,2,DOMESTIC_TRUCKING,12000,KRW,2026-03,2026-03-14,VENDOR-001,STORE-001,WH-SEOUL-01,KR,weight,upload_ui
+INV-20260314-002,1,3PL_STORAGE_FEE,18000,KRW,2026-03,2026-03-14,VENDOR-001,STORE-001,WH-SEOUL-01,KR,onhand_cbm_days,upload_ui
+INV-20260314-003,1,PLATFORM_FEE,22000,KRW,2026-03,2026-03-14,VENDOR-001,STORE-001,WH-SEOUL-01,KR,revenue,upload_ui
